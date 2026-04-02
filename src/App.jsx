@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { P } from "./theme/index.js";
 import { useContractions } from "./hooks/useContractions.js";
 import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
+import { useMode } from "./hooks/useMode.js";
+import { useExpectation } from "./hooks/useExpectation.js";
+import { useTasks } from "./hooks/useTasks.js";
 import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
+import { SettingsModal } from "./components/SettingsModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
 import { ReliefTab } from "./features/relief/ReliefTab.jsx";
+import { ExpectationTab } from "./features/expectation/ExpectationTab.jsx";
 
 const GLOBAL_STYLES = `
   * { box-sizing: border-box; }
@@ -26,12 +31,25 @@ const GLOBAL_STYLES = `
 `;
 
 export default function App() {
+  const { mode, setMode } = useMode();
   const [tab, setTab] = useState("contractions");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // When mode changes, auto-switch Tab 1 to the right id
+  useEffect(() => {
+    setTab((current) => {
+      const isTab1 = current === "contractions" || current === "expectation";
+      if (!isTab1) return current;
+      return mode === "expectation" ? "expectation" : "contractions";
+    });
+  }, [mode]);
 
   const { affirmation, fade } = useAffirmations();
   const hydration = useHydration();
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();
+  const expectation = useExpectation();
+  const tasks = useTasks();
 
   return (
     <>
@@ -48,11 +66,18 @@ export default function App() {
           color: P.text,
         }}
       >
-        <Header affirmation={affirmation} fade={fade} />
-        <TabBar activeTab={tab} onTabChange={setTab} />
+        <Header
+          affirmation={affirmation}
+          fade={fade}
+          mode={mode}
+          onModeToggle={setMode}
+          onSettingsOpen={() => setSettingsOpen(true)}
+        />
+        <TabBar activeTab={tab} onTabChange={setTab} mode={mode} />
 
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 80px" }}>
-          {tab === "contractions" && (
+          {/* Labour mode: Tab 1 = Contractions */}
+          {tab === "contractions" && mode === "labour" && (
             <ContractionsTab
               contractions={contractions.contractions}
               activeStart={contractions.activeStart}
@@ -66,6 +91,22 @@ export default function App() {
             />
           )}
 
+          {/* Expectation mode: Tab 1 = Countdown + Todo */}
+          {tab === "expectation" && mode === "expectation" && (
+            <ExpectationTab
+              dueDate={expectation.dueDate}
+              setDueDate={expectation.setDueDate}
+              countdownFormat={expectation.countdownFormat}
+              setCountdownFormat={expectation.setCountdownFormat}
+              tasks={tasks.tasks}
+              addTask={tasks.addTask}
+              toggleDone={tasks.toggleDone}
+              removeTask={tasks.removeTask}
+              updateTask={tasks.updateTask}
+            />
+          )}
+
+          {/* Tabs 2 & 3: shared by both modes */}
           {tab === "hydration" && (
             <HydrationTab
               drinkInterval={hydration.drinkInterval}
@@ -112,6 +153,8 @@ export default function App() {
           onClose={() => relief.setActiveMethod(null)}
           onSaveMedia={relief.saveMethodMedia}
         />
+
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       </div>
     </>
   );

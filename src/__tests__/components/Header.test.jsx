@@ -6,7 +6,7 @@ describe("Header", () => {
   it("renders the app title", () => {
     render(<Header affirmation="You are doing great!" fade={true} />);
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/Labor Companion/i)).toBeInTheDocument();
+    expect(screen.getByText(/LunaBirth/i)).toBeInTheDocument();
   });
 
   it("renders the affirmation text", () => {

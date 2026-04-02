@@ -1,12 +1,20 @@
 import { P } from "../theme/index.js";
 
-const TABS = [
+const LABOUR_TABS = [
   ["contractions", "🌊", "Contractions"],
-  ["hydration", "💧", "Hydration"],
-  ["relief", "🌿", "Pain Relief"],
+  ["hydration",    "💧", "Hydration"],
+  ["relief",       "🌿", "Pain Relief"],
 ];
 
-export function TabBar({ activeTab, onTabChange }) {
+const EXPECTATION_TABS = [
+  ["expectation", "🤰", "Preparing"],
+  ["hydration",   "💧", "Hydration"],
+  ["relief",      "🌿", "Pain Relief"],
+];
+
+export function TabBar({ activeTab, onTabChange, mode }) {
+  const tabs = mode === "expectation" ? EXPECTATION_TABS : LABOUR_TABS;
+
   return (
     <div
       style={{
@@ -16,7 +24,7 @@ export function TabBar({ activeTab, onTabChange }) {
         padding: "0 4px",
       }}
     >
-      {TABS.map(([id, icon, label]) => (
+      {tabs.map(([id, icon, label]) => (
         <button
           key={id}
           onClick={() => onTabChange(id)}
