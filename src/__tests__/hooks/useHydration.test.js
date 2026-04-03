@@ -11,7 +11,7 @@ vi.mock("../../utils/storage.js", () => ({
 
 describe("useHydration", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   it("starts with default interval of 15 min", () => {
@@ -99,8 +99,10 @@ describe("useHydration", () => {
   it("countdown sets drinkAlert when time runs out", async () => {
     const { result } = renderHook(() => useHydration());
 
-    // Advance timer past the full 15-minute interval
-    act(() => { vi.advanceTimersByTime(16 * 60 * 1000); });
+    // Move Date.now forward by 16 min (past the 15-min interval),
+    // then fire a single interval tick without advancing 16 min of fake time
+    vi.setSystemTime(new Date(Date.now() + 16 * 60 * 1000));
+    act(() => { vi.advanceTimersByTime(1000); }); // fire one tick
 
     expect(result.current.drinkAlert).toBe(true);
     expect(result.current.secsLeft).toBe(0);

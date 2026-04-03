@@ -12,7 +12,7 @@ vi.mock("../../utils/storage.js", () => ({
 
 describe("useContractions", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   it("starts with empty contractions and tracking phase", () => {
@@ -41,8 +41,8 @@ describe("useContractions", () => {
       await result.current.handleContraction(); // start
     });
 
-    // Advance time by 30 seconds
-    act(() => { vi.advanceTimersByTime(30000); });
+    // Advance Date.now by 30s without firing the elapsed setInterval 60 times
+    vi.setSystemTime(new Date(Date.now() + 30000));
 
     await act(async () => {
       await result.current.handleContraction(); // stop
@@ -56,9 +56,9 @@ describe("useContractions", () => {
   it("clears all contractions when clearAll is called", async () => {
     const { result } = renderHook(() => useContractions());
 
-    // Add a contraction
+    // Add a contraction — advance Date.now by 30s without firing the elapsed setInterval
     await act(async () => { await result.current.handleContraction(); });
-    act(() => { vi.advanceTimersByTime(30000); });
+    vi.setSystemTime(new Date(Date.now() + 30000));
     await act(async () => { await result.current.handleContraction(); });
     expect(result.current.contractions).toHaveLength(1);
 
@@ -91,10 +91,10 @@ describe("useContractions", () => {
     const { result } = renderHook(() => useContractions());
 
     for (let i = 0; i < 31; i++) {
-      await act(async () => { await result.current.handleContraction(); });
-      act(() => { vi.advanceTimersByTime(30000); });
-      await act(async () => { await result.current.handleContraction(); });
-      act(() => { vi.advanceTimersByTime(300000); }); // 5 min gap
+      await act(async () => { await result.current.handleContraction(); }); // start
+      vi.setSystemTime(new Date(Date.now() + 30000)); // advance 30s for duration
+      await act(async () => { await result.current.handleContraction(); }); // stop
+      vi.setSystemTime(new Date(Date.now() + 300000)); // advance 5 min gap
     }
 
     expect(result.current.contractions.length).toBeLessThanOrEqual(30);
