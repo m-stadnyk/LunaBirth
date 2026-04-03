@@ -1,37 +1,53 @@
-import { useState } from "react";
-import { P } from "./theme/index.js";
+import { useState, useEffect } from "react";
+import { N } from "./theme/index.js";
+import { useAppMode } from "./hooks/useAppMode.js";
+import { useDueDate } from "./hooks/useDueDate.js";
+import { useTodos } from "./hooks/useTodos.js";
 import { useContractions } from "./hooks/useContractions.js";
 import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
+import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
 import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
+import { SettingsModal } from "./components/SettingsModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
 import { ReliefTab } from "./features/relief/ReliefTab.jsx";
+import { ExpectationTab } from "./features/expectation/ExpectationTab.jsx";
 
 const GLOBAL_STYLES = `
   * { box-sizing: border-box; }
-  body { margin: 0; background: ${P.bg}; }
+  body { margin: 0; background: ${N.bg}; }
   ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-thumb { background: ${P.border}; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: ${N.border}; border-radius: 4px; }
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.85; transform: scale(0.98); }
   }
   .pulsing { animation: pulse 2s ease-in-out infinite; }
   .alertPulse { animation: pulse 1.1s ease-in-out infinite; }
-  input:focus { outline: none; border-color: ${P.rose} !important; }
+  input:focus { outline: none; border-color: ${N.gold} !important; }
 `;
 
-export default function App() {
+function AppInner() {
+  const { locale } = useLocaleContext();
+  const { mode, toggleMode } = useAppMode();
   const [tab, setTab] = useState("contractions");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const { affirmation, fade } = useAffirmations();
+  // When mode changes, switch to the appropriate default tab
+  useEffect(() => {
+    setTab(mode === "expectation" ? "expecting" : "contractions");
+  }, [mode]);
+
+  const { affirmation, fade } = useAffirmations(locale);
   const hydration = useHydration();
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();
+  const dueDate = useDueDate();
+  const todos = useTodos();
 
   return (
     <>
@@ -39,19 +55,45 @@ export default function App() {
       <div
         style={{
           fontFamily: "'DM Sans',sans-serif",
-          background: P.bg,
+          background: `${N.bgImage} center/cover fixed, ${N.bg}`,
           minHeight: "100vh",
           maxWidth: 420,
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          color: P.text,
+          color: N.text,
         }}
       >
-        <Header affirmation={affirmation} fade={fade} />
-        <TabBar activeTab={tab} onTabChange={setTab} />
+        <Header
+          affirmation={affirmation}
+          fade={fade}
+          mode={mode}
+          onToggleMode={toggleMode}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        <TabBar activeTab={tab} onTabChange={setTab} mode={mode} />
 
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 80px" }}>
+
+          {/* ── Expectation mode ── */}
+          {tab === "expecting" && (
+            <ExpectationTab
+              dueDate={dueDate.dueDate}
+              setDueDate={dueDate.setDueDate}
+              countdown={dueDate.countdown}
+              countdownUnit={dueDate.countdownUnit}
+              setCountdownUnit={dueDate.setCountdownUnit}
+              todos={todos.todos}
+              onAddTodo={todos.addTodo}
+              onToggleDone={todos.toggleDone}
+              onSetPriority={todos.setPriority}
+              onSetCalendar={todos.setCalendar}
+              onClearCalendar={todos.clearCalendar}
+              onRemoveTodo={todos.removeTodo}
+            />
+          )}
+
+          {/* ── Labour mode ── */}
           {tab === "contractions" && (
             <ContractionsTab
               contractions={contractions.contractions}
@@ -66,6 +108,7 @@ export default function App() {
             />
           )}
 
+          {/* ── Shared tabs ── */}
           {tab === "hydration" && (
             <HydrationTab
               drinkInterval={hydration.drinkInterval}
@@ -112,7 +155,17 @@ export default function App() {
           onClose={() => relief.setActiveMethod(null)}
           onSaveMedia={relief.saveMethodMedia}
         />
+
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       </div>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <LocaleProvider>
+      <AppInner />
+    </LocaleProvider>
   );
 }

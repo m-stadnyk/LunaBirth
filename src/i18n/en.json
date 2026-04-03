@@ -1,0 +1,120 @@
+{
+  "header": {
+    "title": "LunaBirth"
+  },
+  "tabs": {
+    "contractions": "Contractions",
+    "hydration": "Hydration",
+    "relief": "Pain Relief",
+    "expecting": "Expecting"
+  },
+  "mode": {
+    "labour": "Labour",
+    "expecting": "Expecting"
+  },
+  "contractions": {
+    "tapStart": "Tap when contraction starts",
+    "tapEnd": "Tap to end contraction",
+    "inProgress": "contraction in progress",
+    "recentTitle": "Recent contractions",
+    "clear": "Clear",
+    "clearConfirm": "Yes, clear",
+    "cancel": "Cancel",
+    "every": "Every",
+    "long": "long",
+    "mApart": "m apart",
+    "total": "Total",
+    "last": "Last",
+    "gap": "Gap",
+    "intensifying": "^ intensifying",
+    "spacingOut": "v spacing out",
+    "rule511Title": "5-1-1 Rule Reached",
+    "rule511Body": "Contractions ~5 min apart, ~1 min long, sustained. Most providers recommend heading to your birth location now. Call your midwife or OB."
+  },
+  "hydration": {
+    "untilNextSip": "until next sip",
+    "drinkNow": "Drink now",
+    "glassesToday": "glasses today",
+    "drankBtn": "I just had a sip",
+    "drinkNowBtn": "Drink water now!",
+    "remindEvery": "Remind me every",
+    "add": "Add",
+    "minPlaceholder": "min",
+    "tip": "Small, frequent sips are better than large amounts. Ice chips and popsicles count too!",
+    "suggestionDetected": "detected",
+    "suggestionRecommend": "Doulas recommend sipping every {{minutes}} min at this stage",
+    "apply": "Apply"
+  },
+  "relief": {
+    "sortedFor": "Sorted for {{phase}} — most relevant methods first",
+    "now": "now",
+    "addMethodBtn": "+ Add pain relief method",
+    "newMethod": "New method",
+    "namePlaceholder": "Method name...",
+    "mediaPlaceholder": "Media URL: image, YouTube, Spotify, or any link (optional)",
+    "relevantIn": "Relevant in:",
+    "addMethod": "Add Method",
+    "cancel": "Cancel"
+  },
+  "phases": {
+    "tracking": {
+      "title": "Building Your Pattern",
+      "badge": "Tracking",
+      "meaning": "Log a few more contractions to see your pattern emerge.",
+      "tip": "Rest comfortably, move gently, and stay hydrated."
+    },
+    "early": {
+      "title": "Early Labor",
+      "badge": "Early",
+      "meaning": "Cervix beginning to dilate (0-6 cm). Contractions are becoming more regular — this phase can last many hours.",
+      "tip": "Rest when you can, take gentle walks, eat light snacks. You can typically manage comfortably at home."
+    },
+    "active": {
+      "title": "Active Labor",
+      "badge": "Active",
+      "meaning": "Likely 6-8 cm dilated. Contractions stronger and more consistent — many people head to their birth location now.",
+      "tip": "Focus on breathing, change positions every 20-30 min. Contact your midwife or OB if you haven't."
+    },
+    "transition": {
+      "title": "Transition",
+      "badge": "Transition",
+      "meaning": "The final, most intense phase — and the shortest. Likely 8-10 cm. Your baby is almost here!",
+      "tip": "One contraction at a time. Breathe, vocalize, stay grounded. You are so close!"
+    }
+  },
+  "expecting": {
+    "setDueDatePrompt": "Set your due date to start the countdown",
+    "overdue": "Overdue",
+    "weeks": "weeks",
+    "days": "days",
+    "hours": "hours",
+    "units": {
+      "wks_days": "Wks+Days",
+      "days": "Days",
+      "hours": "Hours"
+    },
+    "todoTitle": "To-do",
+    "focusMode": "Focus mode",
+    "focusModeActive": "Focus (3)",
+    "noTasks": "No tasks yet — add one above",
+    "addTaskPlaceholder": "Add a task…",
+    "priorityLabel": "Priority",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "calendarAdd": "Add to Calendar",
+    "calendarChange": "Change date",
+    "calendarRemove": "Remove",
+    "calendarConfirm": "Add",
+    "markDone": "Mark as done",
+    "markActive": "Mark as active",
+    "deleteTask": "Delete task"
+  },
+  "settings": {
+    "title": "Settings",
+    "languageLabel": "Language",
+    "close": "Close",
+    "en": "English",
+    "uk": "Українська"
+  }
+}
