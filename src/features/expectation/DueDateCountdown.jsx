@@ -42,9 +42,12 @@ export function DueDateCountdown({ countdown, unit, onUnitChange, onSetDueDate, 
             </div>
           )}
 
-          {/* Big number */}
+          {/* Big number (+ inline secondary for wks+days) */}
           {countdown && (
-            <div style={{ marginBottom: 4 }}>
+            <div style={{
+              display: "flex", alignItems: "baseline", justifyContent: "center",
+              flexWrap: "wrap", gap: "0 8px", marginBottom: 12,
+            }}>
               <span
                 data-testid="countdown-primary"
                 style={{
@@ -54,32 +57,28 @@ export function DueDateCountdown({ countdown, unit, onUnitChange, onSetDueDate, 
               >
                 {countdown.primary}
               </span>
-              {" "}
               <span
                 data-testid="countdown-primary-label"
                 style={{ fontSize: 18, color: N.muted, fontWeight: 400 }}
               >
                 {primaryLabel}
               </span>
-            </div>
-          )}
-
-          {/* Secondary (weeks+days only) */}
-          {countdown?.secondary != null && (
-            <div style={{ marginBottom: 12 }}>
-              <span
-                data-testid="countdown-secondary"
-                style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, color: N.silver }}
-              >
-                {countdown.secondary}
-              </span>
-              {" "}
-              <span style={{ fontSize: 14, color: N.muted }}>{secondaryLabel}</span>
+              {countdown.secondary != null && (
+                <>
+                  <span
+                    data-testid="countdown-secondary"
+                    style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, color: N.silver }}
+                  >
+                    {countdown.secondary}
+                  </span>
+                  <span style={{ fontSize: 14, color: N.muted }}>{secondaryLabel}</span>
+                </>
+              )}
             </div>
           )}
 
           {/* Unit toggle */}
-          <div style={{ display: "inline-flex", gap: 6, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, justifyContent: "center", flexWrap: "wrap" }}>
             {units.map(({ key, label }) => (
               <button
                 key={key}
@@ -92,6 +91,7 @@ export function DueDateCountdown({ countdown, unit, onUnitChange, onSetDueDate, 
                   background: unit === key ? N.goldLight : "transparent",
                   color: unit === key ? N.gold : N.muted,
                   cursor: "pointer", fontWeight: unit === key ? 600 : 400,
+                  whiteSpace: "nowrap",
                 }}
               >
                 {label}
