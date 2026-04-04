@@ -8,6 +8,7 @@ import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
 import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
+import { FeatureFlagProvider } from "./context/FeatureFlagContext.jsx";
 import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
@@ -165,7 +166,9 @@ function AppInner() {
 export default function App() {
   return (
     <LocaleProvider>
-      <AppInner />
+      <FeatureFlagProvider>
+        <AppInner />
+      </FeatureFlagProvider>
     </LocaleProvider>
   );
 }

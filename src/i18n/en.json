@@ -115,6 +115,9 @@
     "languageLabel": "Language",
     "close": "Close",
     "en": "English",
-    "uk": "Українська"
-  }
+    "uk": "Українська",
+    "featuresLabel": "Features",
+    "noFlags": "No feature flags configured yet."
+  },
+  "flags": {}
 }
