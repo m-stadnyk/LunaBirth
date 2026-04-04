@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { N } from "../theme/index.js";
 import { useLocaleContext } from "../context/LocaleContext.jsx";
 import { useFeatureFlags } from "../context/FeatureFlagContext.jsx";
 
-function ToggleRow({ label, checked, onChange }) {
+function ToggleRow({ label, checked, onChange, disabled }) {
   return (
     <div
       style={{
@@ -13,13 +14,15 @@ function ToggleRow({ label, checked, onChange }) {
         border: `1px solid ${N.border}`,
         borderRadius: 10,
         padding: "12px 16px",
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <span style={{ color: N.text, fontSize: 15 }}>{label}</span>
       <button
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
+        onClick={() => !disabled && onChange(!checked)}
+        disabled={disabled}
         style={{
           width: 44,
           height: 24,
@@ -27,7 +30,7 @@ function ToggleRow({ label, checked, onChange }) {
           border: "none",
           background: checked ? N.gold : N.border,
           position: "relative",
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
           transition: "background 0.2s",
           flexShrink: 0,
         }}
@@ -49,7 +52,240 @@ function ToggleRow({ label, checked, onChange }) {
   );
 }
 
-export function SettingsModal({ open, onClose }) {
+function SectionDivider() {
+  return <div style={{ borderTop: `1px solid ${N.border}`, margin: "20px 0" }} />;
+}
+
+function SectionLabel({ children }) {
+  return (
+    <p style={{ margin: "0 0 12px", color: N.muted, fontSize: 13 }}>{children}</p>
+  );
+}
+
+function NotificationsSection({ notifications, t }) {
+  const isDenied = notifications.permission === "denied";
+  return (
+    <>
+      <SectionLabel>{t("settings.notificationsLabel")}</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <ToggleRow
+          label={t("settings.waterNotifLabel")}
+          checked={notifications.enabled}
+          onChange={() => notifications.toggle()}
+          disabled={isDenied}
+        />
+        {isDenied && (
+          <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
+            {t("settings.notifDeniedHint")}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function CloudSyncSection({ cloudSync, t }) {
+  const [joinCode, setJoinCode] = useState("");
+  const [joinMode, setJoinMode] = useState(false);
+
+  if (!cloudSync.isSignedIn) {
+    return (
+      <>
+        <SectionLabel>{t("settings.cloudSyncLabel")}</SectionLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button
+            onClick={() => cloudSync.signIn()}
+            disabled={cloudSync.syncing}
+            style={{
+              background: N.gold,
+              color: "#1a1a1a",
+              border: "none",
+              borderRadius: 10,
+              padding: "12px 16px",
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: cloudSync.syncing ? "not-allowed" : "pointer",
+              opacity: cloudSync.syncing ? 0.7 : 1,
+              textAlign: "left",
+            }}
+          >
+            {cloudSync.syncing ? t("settings.cloudSyncSyncing") : t("settings.cloudSyncStart")}
+          </button>
+
+          {!joinMode ? (
+            <button
+              onClick={() => setJoinMode(true)}
+              style={{
+                background: "none",
+                border: `1px solid ${N.border}`,
+                borderRadius: 10,
+                padding: "10px 16px",
+                fontSize: 14,
+                color: N.muted,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              {t("settings.cloudSyncJoinLabel")}
+            </button>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                maxLength={6}
+                placeholder={t("settings.cloudSyncJoinPlaceholder")}
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                style={{
+                  flex: 1,
+                  background: N.cream,
+                  border: `1px solid ${N.border}`,
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  color: N.text,
+                  fontSize: 15,
+                  fontFamily: "monospace",
+                  letterSpacing: "0.15em",
+                }}
+              />
+              <button
+                onClick={() => { cloudSync.joinAsPartner(joinCode); setJoinMode(false); setJoinCode(""); }}
+                disabled={joinCode.length < 6 || cloudSync.syncing}
+                style={{
+                  background: N.gold,
+                  color: "#1a1a1a",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: joinCode.length < 6 ? "not-allowed" : "pointer",
+                  opacity: joinCode.length < 6 ? 0.6 : 1,
+                }}
+              >
+                {t("settings.cloudSyncJoin")}
+              </button>
+            </div>
+          )}
+
+          <p style={{ margin: "4px 0 0", color: N.muted, fontSize: 12, paddingLeft: 4 }}>
+            {t("settings.cloudSyncPrivacyNote")}
+          </p>
+
+          {cloudSync.error && (
+            <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
+              {t("settings.cloudSyncError")}
+            </p>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  const isPartner = cloudSync.role === "partner";
+  return (
+    <>
+      <SectionLabel>{t("settings.cloudSyncLabel")}</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          style={{
+            background: N.cream,
+            border: `1px solid ${N.border}`,
+            borderRadius: 10,
+            padding: "12px 16px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: N.gold, fontSize: 14, fontWeight: 600 }}>
+              {isPartner ? t("settings.cloudSyncRolePartner") : t("settings.cloudSyncSignedIn")}
+            </span>
+            {cloudSync.syncing && (
+              <span style={{ color: N.muted, fontSize: 12 }}>{t("settings.cloudSyncSyncing")}</span>
+            )}
+          </div>
+          {cloudSync.lastSynced && !cloudSync.syncing && (
+            <div style={{ color: N.muted, fontSize: 12, marginTop: 4 }}>
+              {t("settings.cloudSyncLastSynced", { time: new Date(cloudSync.lastSynced).toLocaleTimeString() })}
+            </div>
+          )}
+        </div>
+
+        {!isPartner && cloudSync.inviteCode && (
+          <div
+            style={{
+              background: N.cream,
+              border: `1px solid ${N.border}`,
+              borderRadius: 10,
+              padding: "12px 16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <span style={{ color: N.muted, fontSize: 13 }}>
+              {t("settings.cloudSyncJoinLabel")}
+            </span>
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "0.2em",
+                color: N.gold,
+              }}
+            >
+              {cloudSync.inviteCode}
+            </span>
+          </div>
+        )}
+
+        {!isPartner && (
+          <button
+            onClick={() => cloudSync.sync()}
+            disabled={cloudSync.syncing}
+            style={{
+              background: N.cream,
+              border: `1px solid ${N.border}`,
+              borderRadius: 10,
+              padding: "10px 16px",
+              fontSize: 14,
+              color: cloudSync.syncing ? N.muted : N.text,
+              cursor: cloudSync.syncing ? "not-allowed" : "pointer",
+              textAlign: "left",
+            }}
+          >
+            {t("settings.cloudSyncSyncNow")}
+          </button>
+        )}
+
+        <button
+          onClick={() => cloudSync.signOut()}
+          style={{
+            background: "none",
+            border: `1px solid ${N.border}`,
+            borderRadius: 10,
+            padding: "10px 16px",
+            fontSize: 14,
+            color: N.muted,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          {t("settings.cloudSyncSignOut")}
+        </button>
+
+        {cloudSync.error && (
+          <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
+            {t("settings.cloudSyncError")}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+export function SettingsModal({ open, onClose, notifications, cloudSync }) {
   const { locale, setLocale, t, supportedLocales } = useLocaleContext();
   const { flags, setFlag, flagDefs } = useFeatureFlags();
 
@@ -74,6 +310,8 @@ export function SettingsModal({ open, onClose }) {
           borderTop: `1px solid ${N.border}`,
           borderRadius: "16px 16px 0 0",
           padding: "24px 20px 40px",
+          maxHeight: "85vh",
+          overflowY: "auto",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -91,10 +329,7 @@ export function SettingsModal({ open, onClose }) {
           </button>
         </div>
 
-        <p style={{ margin: "0 0 12px", color: N.muted, fontSize: 13 }}>
-          {t("settings.languageLabel")}
-        </p>
-
+        <SectionLabel>{t("settings.languageLabel")}</SectionLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {supportedLocales.map((code) => (
             <button
@@ -118,12 +353,22 @@ export function SettingsModal({ open, onClose }) {
           ))}
         </div>
 
-        <div style={{ borderTop: `1px solid ${N.border}`, margin: "20px 0" }} />
+        {notifications && (
+          <>
+            <SectionDivider />
+            <NotificationsSection notifications={notifications} t={t} />
+          </>
+        )}
 
-        <p style={{ margin: "0 0 12px", color: N.muted, fontSize: 13 }}>
-          {t("settings.featuresLabel")}
-        </p>
+        {cloudSync && (
+          <>
+            <SectionDivider />
+            <CloudSyncSection cloudSync={cloudSync} t={t} />
+          </>
+        )}
 
+        <SectionDivider />
+        <SectionLabel>{t("settings.featuresLabel")}</SectionLabel>
         {flagDefs.length === 0 ? (
           <p style={{ margin: 0, color: N.muted, fontSize: 13 }}>
             {t("settings.noFlags")}

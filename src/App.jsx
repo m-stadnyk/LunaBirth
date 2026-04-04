@@ -7,8 +7,11 @@ import { useContractions } from "./hooks/useContractions.js";
 import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
+import { useNotifications } from "./hooks/useNotifications.js";
+import { useCloudSync } from "./hooks/useCloudSync.js";
 import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
 import { FeatureFlagProvider } from "./context/FeatureFlagContext.jsx";
+import { DatabaseProvider } from "./context/DatabaseContext.jsx";
 import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
@@ -44,7 +47,9 @@ function AppInner() {
   }, [mode]);
 
   const { affirmation, fade } = useAffirmations(locale);
-  const hydration = useHydration();
+  const notifications = useNotifications();
+  const cloudSync = useCloudSync();
+  const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();
   const dueDate = useDueDate();
@@ -157,7 +162,12 @@ function AppInner() {
           onSaveMedia={relief.saveMethodMedia}
         />
 
-        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          notifications={notifications}
+          cloudSync={cloudSync}
+        />
       </div>
     </>
   );
@@ -167,7 +177,9 @@ export default function App() {
   return (
     <LocaleProvider>
       <FeatureFlagProvider>
-        <AppInner />
+        <DatabaseProvider>
+          <AppInner />
+        </DatabaseProvider>
       </FeatureFlagProvider>
     </LocaleProvider>
   );

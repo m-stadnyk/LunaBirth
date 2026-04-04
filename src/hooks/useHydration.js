@@ -12,8 +12,11 @@ const KEYS = {
 /**
  * Manages hydration reminders: countdown timer, drink logging, interval management,
  * and phase-based drink suggestions. Persists all state to localStorage.
+ *
+ * @param {object} [opts]
+ * @param {function} [opts.onDrinkAlert] - Called once when the countdown transitions to 0 (false→true).
  */
-export function useHydration() {
+export function useHydration({ onDrinkAlert } = {}) {
   const [drinkInterval, setDrinkInterval] = useState(15);
   const drinkIntervalRef = useRef(15);
   const [intervals, setIntervals] = useState([5, 15, 30]);
@@ -23,6 +26,8 @@ export function useHydration() {
   const [drinkCount, setDrinkCount] = useState(0);
   const [secsLeft, setSecsLeft] = useState(1200);
   const [drinkAlert, setDrinkAlert] = useState(false);
+  const prevAlertRef = useRef(false);
+  const onDrinkAlertRef = useRef(onDrinkAlert);
   const [drinkSuggestion, setDrinkSuggestion] = useState(null);
 
   // Load persisted hydration state on mount
@@ -50,13 +55,22 @@ export function useHydration() {
     })();
   }, []);
 
+  // Keep callback ref current so the interval closure always calls the latest version
+  useEffect(() => { onDrinkAlertRef.current = onDrinkAlert; }, [onDrinkAlert]);
+
   // Countdown timer: ticks every second
   useEffect(() => {
     const id = setInterval(() => {
       const el = Math.floor((Date.now() - lastDrank) / 1000);
       const left = drinkInterval * 60 - el;
+      const firing = left <= 0;
       setSecsLeft(Math.max(0, left));
-      setDrinkAlert(left <= 0);
+      setDrinkAlert(firing);
+      // Fire notification only on the false→true transition (once per alert, not every tick)
+      if (firing && !prevAlertRef.current) {
+        onDrinkAlertRef.current?.();
+      }
+      prevAlertRef.current = firing;
     }, 1000);
     return () => clearInterval(id);
   }, [lastDrank, drinkInterval]);
@@ -119,6 +133,7 @@ export function useHydration() {
     const nc = drinkCount + 1;
     setDrinkCount(nc);
     setDrinkAlert(false);
+    prevAlertRef.current = false;
     try {
       await storage.set(KEYS.lastDrank, String(now));
       await storage.set(KEYS.drinkCount, String(nc));
