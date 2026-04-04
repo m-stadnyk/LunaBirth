@@ -19,7 +19,7 @@ export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }
         <h1
           style={{
             fontFamily: "'Cormorant Garamond',serif",
-            fontSize: 24,
+            fontSize: 30,
             fontWeight: 400,
             margin: 0,
             color: N.gold,
@@ -32,15 +32,16 @@ export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }
           style={{
             fontFamily: "'Cormorant Garamond',serif",
             fontStyle: "italic",
-            fontSize: 26,
+            fontSize: 16,
             color: N.muted,
             marginTop: 4,
             marginBottom: 0,
             opacity: fade ? 1 : 0,
             transition: "opacity 0.5s",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            lineHeight: 1.4,
+            minHeight: "2.8em",
+            overflowWrap: "break-word",
+            wordBreak: "break-word",
           }}
         >
           {affirmation}

@@ -53,7 +53,7 @@ export function TabBar({ activeTab, onTabChange, mode }) {
             }}
           >
             <Icon name={icon} size={18} color={active ? N.gold : N.muted} strokeWidth={active ? 2 : 1.5} />
-            <span>{label}</span>
+            <span style={{ overflowWrap: "break-word", wordBreak: "break-word", textAlign: "center" }}>{label}</span>
           </button>
         );
       })}

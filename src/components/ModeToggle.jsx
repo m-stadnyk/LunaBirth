@@ -19,8 +19,10 @@ export function ModeToggle({ mode, onToggle }) {
         fontWeight: 500,
         color: isLabour ? N.gold : N.silver,
         cursor: "pointer",
-        whiteSpace: "nowrap",
         letterSpacing: "0.04em",
+        maxWidth: 120,
+        wordBreak: "break-word",
+        textAlign: "center",
       }}
     >
       {isLabour ? `✦ ${t("mode.labour")}` : `☽ ${t("mode.expecting")}`}
