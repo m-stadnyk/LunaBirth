@@ -1,6 +1,6 @@
 # LunaBirth — Personal Labour Support App
 
-A mobile-first Progressive Web App (PWA) for tracking contractions, hydration, and pain relief techniques during labour. Runs entirely in the browser — no backend, no accounts, all data stays on your device.
+A mobile-first Progressive Web App (PWA) for tracking contractions, hydration, and pain relief techniques during labour. Runs entirely in the browser — no backend required. All data stays on your device by default; cloud sync and partner sharing are available optionally via Supabase.
 
 ## Features
 
@@ -11,6 +11,7 @@ A mobile-first Progressive Web App (PWA) for tracking contractions, hydration, a
 - **Affirmations** — rotating supportive messages throughout
 - **Expectation Mode** — due date countdown and task list for pre-labour preparation
 - **Bilingual** — English and Ukrainian (🇬🇧 / 🇺🇦)
+- **Cloud Sync & Partner Sharing** *(optional)* — real-time sync across devices via Supabase
 
 ---
 
@@ -44,7 +45,16 @@ node scripts/generate-icons.js
 
 This creates `public/icons/icon-192.png` and `public/icons/icon-512.png` required by the PWA manifest.
 
-### 4. Start the development server
+### 4. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+- **Local-only mode** (default): leave the `.env` values blank — all data stays in `localStorage`.
+- **Cloud sync mode**: fill in your Supabase credentials (see [Cloud Sync Setup](#cloud-sync--partner-sharing-optional) below).
+
+### 5. Start the development server
 
 ```bash
 npm run dev
@@ -103,6 +113,49 @@ The script prints the local URL to open on your phone.
 
 ---
 
+## Cloud Sync & Partner Sharing *(optional)*
+
+Cloud sync lets you share live labour data with a partner on another device in real time. It uses [Supabase](https://supabase.com) (free tier is sufficient).
+
+### 1. Create a Supabase project
+
+1. Sign up at [supabase.com](https://supabase.com) and create a new project
+2. Go to **Project Settings → API** and copy:
+   - **Project URL** (`https://your-project-id.supabase.co`)
+   - **anon / public key**
+
+### 2. Run the database schema
+
+In your Supabase project, go to **Database → SQL Editor → New query**, paste the contents of [`supabase/schema.sql`](supabase/schema.sql), and run it.
+
+This creates the `sessions`, `contraction_snapshots`, `hydration_snapshots`, and `todo_snapshots` tables with Row Level Security policies enforcing owner/partner access.
+
+### 3. Add credentials to `.env`
+
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### 4. Enable Realtime
+
+In the Supabase dashboard, go to **Database → Replication** and enable replication for:
+- `contraction_snapshots`
+- `hydration_snapshots`
+- `todo_snapshots`
+
+*(The schema SQL also includes `ALTER PUBLICATION` statements that do this automatically.)*
+
+### How partner sharing works
+
+1. The **primary user** (labouring person) signs in and creates a session — a short invite code is generated
+2. The **partner** opens the app, enters the invite code, and gets real-time read-only access to contractions, hydration, and todos
+3. All writes are locked to the owner; the partner view updates live via Supabase Realtime
+
+> **Privacy note:** Without Supabase credentials, the app runs entirely in local-only mode — no data ever leaves the device.
+
+---
+
 ## Tests
 
 ```bash
@@ -122,13 +175,19 @@ Test files live in `src/__tests__/`, mirroring the `src/` structure.
 src/
 ├── App.jsx                    # Root component — wires hooks to tabs
 ├── main.jsx                   # React entry point
+├── adapters/
+│   ├── DatabaseAdapter.js     # Abstract base class for storage adapters
+│   ├── LocalAdapter.js        # localStorage implementation
+│   └── SupabaseAdapter.js     # Supabase cloud implementation
 ├── constants/
 │   ├── affirmations.js        # Rotating positive messages
 │   ├── phases.js              # Labour phase definitions (colors, thresholds, tips)
 │   ├── methods.js             # Default pain relief methods
-│   └── index.js
+│   └── featureFlags.js        # Feature flag definitions
 ├── context/
-│   └── LocaleContext.jsx      # i18n provider (en/uk)
+│   ├── LocaleContext.jsx      # i18n provider (en/uk)
+│   ├── DatabaseContext.jsx    # Active storage adapter provider
+│   └── FeatureFlagContext.jsx # Feature flag provider
 ├── theme/
 │   └── index.js               # Color palette tokens (N.* dark / P.* warm)
 ├── utils/
@@ -141,14 +200,18 @@ src/
 │   ├── useHydration.js        # Drink reminders, countdown, interval management
 │   ├── useAffirmations.js     # Rotating message carousel
 │   ├── useRelief.js           # Pain relief methods CRUD + persistence
-│   └── useTodos.js            # Expectation mode task list
+│   ├── useTodos.js            # Expectation mode task list
+│   ├── useCloudSync.js        # Cloud sync orchestration
+│   ├── useNotifications.js    # Push notification scheduling
+│   └── useFeatureFlags.js     # Feature flag access hook
 ├── components/
 │   ├── Header.jsx             # App header with affirmation
 │   ├── TabBar.jsx             # Tab navigation
 │   ├── Icon.jsx               # Inline SVG icon system
 │   ├── MediaDisplay.jsx       # Image / YouTube / Spotify / link renderer
 │   ├── MediaInlineEditor.jsx  # URL input widget
-│   └── MethodModal.jsx        # Full-screen method detail overlay
+│   ├── MethodModal.jsx        # Full-screen method detail overlay
+│   └── SettingsModal.jsx      # Settings + Supabase connection UI
 ├── features/
 │   ├── contractions/ContractionsTab.jsx
 │   ├── hydration/HydrationTab.jsx
@@ -162,6 +225,8 @@ src/
 ---
 
 ## Data Persistence
+
+### Local mode (default)
 
 All data is stored in `localStorage` — private to your device, never sent anywhere.
 
@@ -179,6 +244,10 @@ All data is stored in `localStorage` — private to your device, never sent anyw
 | `luna_countdown_unit` | Countdown display unit |
 | `luna_todos` | Task list array |
 
+### Cloud mode (Supabase)
+
+When cloud sync is enabled, snapshots are stored in Supabase tables (`contraction_snapshots`, `hydration_snapshots`, `todo_snapshots`) with Row Level Security — only the session owner and invited partners can access the data.
+
 ---
 
 ## Tech Stack
@@ -191,4 +260,4 @@ All data is stored in `localStorage` — private to your device, never sent anyw
 | Tests | Vitest 4 + @testing-library/react |
 | Styling | Inline CSS-in-JS (theme tokens) |
 | i18n | Custom context-based system |
-| Storage | Browser `localStorage` only |
+| Storage | `localStorage` (local) / Supabase (cloud) |
