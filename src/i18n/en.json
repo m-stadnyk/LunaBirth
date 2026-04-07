@@ -117,7 +117,28 @@
     "en": "English",
     "uk": "Українська",
     "featuresLabel": "Features",
-    "noFlags": "No feature flags configured yet."
+    "noFlags": "No feature flags configured yet.",
+    "notificationsLabel": "Notifications",
+    "waterNotifLabel": "Water reminder notifications",
+    "notifDeniedHint": "Notifications blocked — enable them in your browser settings.",
+    "cloudSyncLabel": "Cloud Sync",
+    "cloudSyncStart": "Sync & share session",
+    "cloudSyncInviteCode": "Invite code: {{code}}",
+    "cloudSyncJoinLabel": "Join as partner",
+    "cloudSyncJoinPlaceholder": "Enter 6-digit code",
+    "cloudSyncJoin": "Join",
+    "cloudSyncSignOut": "Sign out of sync",
+    "cloudSyncLastSynced": "Last synced: {{time}}",
+    "cloudSyncSyncing": "Syncing…",
+    "cloudSyncError": "Sync failed. Try again.",
+    "cloudSyncSignedIn": "Synced to cloud",
+    "cloudSyncPrivacyNote": "No account needed. Your data is stored anonymously.",
+    "cloudSyncSyncNow": "Sync now",
+    "cloudSyncRolePartner": "Connected as partner"
+  },
+  "notifications": {
+    "waterTitle": "Time to drink! 💧",
+    "waterBody": "Your water reminder interval has ended."
   },
   "flags": {}
 }
