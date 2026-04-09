@@ -243,6 +243,26 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 
 ## Testing Conventions
 
+### Test-Driven Development (TDD)
+Prefer TDD for all new code and refactoring. The goal is to catch bugs at the earliest possible point — before the implementation exists.
+
+**Workflow:**
+1. **Red** — write a failing test that describes the desired behaviour.
+2. **Green** — write the minimum code to make it pass.
+3. **Refactor** — clean up while keeping tests green.
+
+**Apply TDD to:**
+- All new hooks and utilities — write edge-case tests first, then implement.
+- Bug fixes — write a test that reproduces the bug before fixing it; the test proves the fix.
+- Refactors — ensure existing tests cover the affected paths before touching code; add missing ones first.
+- New components — write render/interaction tests before wiring up the JSX.
+
+**Practical notes:**
+- Run `npm run test:watch` while developing to get a tight red/green feedback loop.
+- Keep each test focused on one behaviour; prefer many small tests over a few large ones.
+- Test observable behaviour (outputs, DOM state, hook return values), not implementation details.
+
+### General Conventions
 - Test files live in `src/__tests__/` mirroring `src/` structure.
 - Adapters: `src/__tests__/adapters/`, Hooks: `src/__tests__/hooks/`, Components: `src/__tests__/components/`, Context: `src/__tests__/context/`, Utils: `src/__tests__/utils/`.
 - `src/__tests__/setup.js` provides: localStorage mock, jest-dom matchers, Vitest globals.
@@ -269,7 +289,7 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 3. **No TypeScript** — plain JSX throughout; do not convert files.
 4. **Privacy first** — no analytics, no tracking. Cloud sync is opt-in and user-controlled.
 5. **i18n everything** — all user-visible text must have keys in both `en.json` and `uk.json`.
-6. **Test coverage** — add tests in `src/__tests__/` for any new hook, utility, or adapter.
+6. **TDD first** — write tests before (or alongside) implementation for all new hooks, utilities, adapters, and bug fixes. See Testing Conventions for the workflow.
 7. **Phase-aware UI** — new features in labour mode should respect the current phase (use `currentPhase` from `useContractions()`).
 8. **Affirmations rotate every 9 seconds** — do not change this interval without updating `useAffirmations.js`.
 9. **Feature flags** — new experimental features should be gated behind a flag defined in `src/constants/featureFlags.js`.
