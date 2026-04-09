@@ -119,3 +119,7 @@ CREATE TRIGGER todo_snapshots_updated_at
 ALTER PUBLICATION supabase_realtime ADD TABLE contraction_snapshots;
 ALTER PUBLICATION supabase_realtime ADD TABLE todo_snapshots;
 ALTER PUBLICATION supabase_realtime ADD TABLE hydration_snapshots;
+
+-- ─── Enable Realtime on sessions (for mode sync) ──────────────────────────────
+-- Partners subscribe to this to detect when the primary user switches to labour mode.
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;

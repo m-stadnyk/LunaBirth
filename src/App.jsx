@@ -36,8 +36,8 @@ const GLOBAL_STYLES = `
 `;
 
 function AppInner() {
-  const { locale } = useLocaleContext();
-  const { mode, toggleMode } = useAppMode();
+  const { locale, t } = useLocaleContext();
+  const { mode, setMode, toggleMode } = useAppMode();
   const [tab, setTab] = useState("contractions");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -48,7 +48,20 @@ function AppInner() {
 
   const { affirmation, fade } = useAffirmations(locale);
   const notifications = useNotifications();
-  const cloudSync = useCloudSync();
+  const cloudSync = useCloudSync({
+    mode,
+    onRemoteModeChange: (newMode) => {
+      setMode(newMode);
+      if (newMode === "labour" && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification(t("notifications.labourStarted.title"), {
+          body: t("notifications.labourStarted.body"),
+          icon: "/icons/icon-192x192.png",
+          tag: "luna-mode",
+          renotify: true,
+        });
+      }
+    },
+  });
   const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();

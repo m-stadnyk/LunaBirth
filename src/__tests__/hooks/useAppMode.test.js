@@ -17,10 +17,10 @@ describe("useAppMode", () => {
     storage.get.mockResolvedValue(null);
   });
 
-  it("defaults to 'labour' when nothing is stored", async () => {
+  it("defaults to 'expectation' when nothing is stored", async () => {
     const { result } = renderHook(() => useAppMode());
     await act(async () => {});
-    expect(result.current.mode).toBe("labour");
+    expect(result.current.mode).toBe("expectation");
   });
 
   it("restores persisted mode from storage on mount", async () => {
@@ -68,16 +68,16 @@ describe("useAppMode", () => {
   it("exposes a toggleMode convenience function", async () => {
     const { result } = renderHook(() => useAppMode());
     await act(async () => {});
-    expect(result.current.mode).toBe("labour");
-
-    await act(async () => {
-      result.current.toggleMode();
-    });
     expect(result.current.mode).toBe("expectation");
 
     await act(async () => {
       result.current.toggleMode();
     });
     expect(result.current.mode).toBe("labour");
+
+    await act(async () => {
+      result.current.toggleMode();
+    });
+    expect(result.current.mode).toBe("expectation");
   });
 });

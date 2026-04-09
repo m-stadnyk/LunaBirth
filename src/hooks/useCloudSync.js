@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { storage } from "../utils/storage.js";
 import { DatabaseContext } from "../context/DatabaseContext.jsx";
 import { LocalAdapter } from "../adapters/LocalAdapter.js";
@@ -14,6 +14,13 @@ const KEYS = {
 /**
  * Manages cloud authentication, session sharing, and manual sync.
  *
+ * @param {object} [options]
+ * @param {string} [options.mode]               Current app mode ("labour"|"expectation").
+ *   When the primary user is signed in, any change to this value is immediately
+ *   persisted to Supabase so the partner receives it via Realtime.
+ * @param {function} [options.onRemoteModeChange]  Called with the new mode string
+ *   when the partner detects that the primary has switched modes.
+ *
  * Flow for primary user:
  *   1. signIn() → anonymous auth + createSession() → returns inviteCode
  *   2. Share inviteCode with partner (show in settings)
@@ -22,10 +29,11 @@ const KEYS = {
  * Flow for partner:
  *   1. joinAsPartner(code) → anonymous auth + joinSession(code)
  *   2. Data from primary becomes visible via Realtime subscriptions
+ *   3. Mode changes from primary arrive via subscribeSettings → onRemoteModeChange
  *
  * Sign-out reverts the context adapter back to LocalAdapter.
  */
-export function useCloudSync() {
+export function useCloudSync({ mode, onRemoteModeChange } = {}) {
   const { setAdapter } = useContext(DatabaseContext);
 
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -36,7 +44,29 @@ export function useCloudSync() {
   const [lastSynced, setLastSynced] = useState(null);
   const [error, setError] = useState(null);
 
-  // Restore persisted session on mount
+  // Holds the active SupabaseAdapter instance so we can call saveSettings / subscribeSettings
+  // without needing to instantiate a new adapter (which wouldn't have #sessionId set).
+  const adapterRef = useRef(null);
+
+  // Holds the unsubscribe function for the settings Realtime channel.
+  const settingsUnsubRef = useRef(null);
+
+  // ── Settings subscription (partner) ─────────────────────────────────────────
+
+  const setupSettingsSubscription = useCallback((adapter) => {
+    if (settingsUnsubRef.current) {
+      settingsUnsubRef.current();
+      settingsUnsubRef.current = null;
+    }
+    settingsUnsubRef.current = adapter.subscribeSettings((settings) => {
+      if (settings.mode && onRemoteModeChange) {
+        onRemoteModeChange(settings.mode);
+      }
+    });
+  }, [onRemoteModeChange]);
+
+  // ── Restore persisted session on mount ────────────────────────────────────────
+
   useEffect(() => {
     (async () => {
       const [uid, sid, r, ls, ic] = await Promise.all([
@@ -56,12 +86,18 @@ export function useCloudSync() {
           // Restore internal session state via joinSession/createSession is not ideal;
           // instead we set a flag and let the adapter reconstruct lazily.
           // For now, mark as signed in and let the user re-sync if needed.
+          adapterRef.current = adapter;
           setAdapter(adapter);
           setIsSignedIn(true);
           setSessionId(sid.value);
-          setRole(r?.value ?? "primary");
+          const restoredRole = r?.value ?? "primary";
+          setRole(restoredRole);
           setLastSynced(ls?.value ? +ls.value : null);
           setInviteCode(ic?.value ?? null);
+
+          if (restoredRole === "partner") {
+            setupSettingsSubscription(adapter);
+          }
         } catch {
           // Credentials expired or network error — stay in local mode
         }
@@ -69,9 +105,28 @@ export function useCloudSync() {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /**
-   * Sign in as the primary user: anonymous auth + create a new birth session.
-   */
+  // ── Auto-sync mode for primary ────────────────────────────────────────────────
+  // Whenever the primary user changes mode, push it to Supabase immediately so
+  // the partner receives the update via Realtime.
+
+  useEffect(() => {
+    if (!isSignedIn || role !== "primary" || !mode || !adapterRef.current) return;
+    adapterRef.current.saveSettings({ mode }).catch(() => {});
+  }, [mode, isSignedIn, role]);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (settingsUnsubRef.current) {
+        settingsUnsubRef.current();
+        settingsUnsubRef.current = null;
+      }
+    };
+  }, []);
+
+  // ── signIn (primary) ─────────────────────────────────────────────────────────
+
   const signIn = useCallback(async () => {
     setError(null);
     setSyncing(true);
@@ -96,7 +151,7 @@ export function useCloudSync() {
         adapter.saveContractions(contractions),
         adapter.saveHydration(hydration ?? {}),
         adapter.saveTodos(todos),
-        adapter.saveSettings(settings ?? {}),
+        adapter.saveSettings({ ...(settings ?? {}), mode }),
       ]);
 
       const now = Date.now();
@@ -108,6 +163,7 @@ export function useCloudSync() {
         storage.set(KEYS.inviteCode, code),
       ]);
 
+      adapterRef.current = adapter;
       setAdapter(adapter);
       setIsSignedIn(true);
       setSessionId(sid);
@@ -119,12 +175,10 @@ export function useCloudSync() {
     } finally {
       setSyncing(false);
     }
-  }, [setAdapter]);
+  }, [setAdapter, mode]);
 
-  /**
-   * Join an existing session as a partner using the 6-character invite code.
-   * @param {string} code
-   */
+  // ── joinAsPartner ─────────────────────────────────────────────────────────────
+
   const joinAsPartner = useCallback(async (code) => {
     setError(null);
     setSyncing(true);
@@ -143,22 +197,24 @@ export function useCloudSync() {
         storage.set(KEYS.inviteCode, code),
       ]);
 
+      adapterRef.current = adapter;
       setAdapter(adapter);
       setIsSignedIn(true);
       setSessionId(sid);
       setInviteCode(code);
       setRole("partner");
       setLastSynced(now);
+
+      setupSettingsSubscription(adapter);
     } catch (err) {
       setError(err.message ?? "Failed to join session");
     } finally {
       setSyncing(false);
     }
-  }, [setAdapter]);
+  }, [setAdapter, setupSettingsSubscription]);
 
-  /**
-   * Push all current local data to the cloud (primary only).
-   */
+  // ── sync (primary manual push) ────────────────────────────────────────────────
+
   const sync = useCallback(async () => {
     if (!isSignedIn || role === "partner") return;
     setError(null);
@@ -189,11 +245,17 @@ export function useCloudSync() {
     }
   }, [isSignedIn, role]);
 
-  /**
-   * Sign out and revert to local-only storage.
-   */
+  // ── signOut ───────────────────────────────────────────────────────────────────
+
   const signOut = useCallback(async () => {
     setError(null);
+
+    // Tear down settings subscription before clearing state
+    if (settingsUnsubRef.current) {
+      settingsUnsubRef.current();
+      settingsUnsubRef.current = null;
+    }
+
     try {
       const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
       const adapter = new SupabaseAdapter();
@@ -211,6 +273,7 @@ export function useCloudSync() {
       storage.set(KEYS.inviteCode, ""),
     ]);
 
+    adapterRef.current = null;
     setAdapter(new LocalAdapter());
     setIsSignedIn(false);
     setSessionId(null);

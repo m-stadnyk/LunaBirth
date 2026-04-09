@@ -7,16 +7,26 @@ import { DatabaseProvider } from "../../context/DatabaseContext.jsx";
 // ── Hoisted shared mock object ────────────────────────────────────────────────
 // vi.hoisted runs before vi.mock factories and imports, so we can safely
 // reference mockSupabaseAdapter both inside mocks and in test assertions.
-const mockSupabaseAdapter = vi.hoisted(() => ({
-  signInAnonymously: vi.fn(async () => ({ userId: "user-abc" })),
-  signOut: vi.fn(async () => {}),
-  createSession: vi.fn(async () => ({ sessionId: "sess-123", inviteCode: "ABC123" })),
-  joinSession: vi.fn(async () => ({ sessionId: "sess-456" })),
-  saveContractions: vi.fn(async () => {}),
-  saveHydration: vi.fn(async () => {}),
-  saveTodos: vi.fn(async () => {}),
-  saveSettings: vi.fn(async () => {}),
-}));
+const mockSupabaseAdapter = vi.hoisted(() => {
+  let _settingsCallback = null;
+  return {
+    signInAnonymously: vi.fn(async () => ({ userId: "user-abc" })),
+    signOut: vi.fn(async () => {}),
+    createSession: vi.fn(async () => ({ sessionId: "sess-123", inviteCode: "ABC123" })),
+    joinSession: vi.fn(async () => ({ sessionId: "sess-456" })),
+    saveContractions: vi.fn(async () => {}),
+    saveHydration: vi.fn(async () => {}),
+    saveTodos: vi.fn(async () => {}),
+    saveSettings: vi.fn(async () => {}),
+    subscribeSettings: vi.fn((cb) => {
+      _settingsCallback = cb;
+      return vi.fn(); // unsubscribe fn
+    }),
+    // Test helper — trigger the settings Realtime callback
+    _triggerSettings: (settings) => { if (_settingsCallback) _settingsCallback(settings); },
+    _resetSettingsCallback: () => { _settingsCallback = null; },
+  };
+});
 
 // ── Mock storage ─────────────────────────────────────────────────────────────
 vi.mock("../../utils/storage.js", () => ({
@@ -52,6 +62,7 @@ function wrapper({ children }) {
 describe("useCloudSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSupabaseAdapter._resetSettingsCallback();
     // Restore defaults after clearAllMocks
     mockSupabaseAdapter.signInAnonymously.mockResolvedValue({ userId: "user-abc" });
     mockSupabaseAdapter.createSession.mockResolvedValue({ sessionId: "sess-123", inviteCode: "ABC123" });
@@ -61,6 +72,12 @@ describe("useCloudSync", () => {
     mockSupabaseAdapter.saveHydration.mockResolvedValue();
     mockSupabaseAdapter.saveTodos.mockResolvedValue();
     mockSupabaseAdapter.saveSettings.mockResolvedValue();
+    mockSupabaseAdapter.subscribeSettings.mockImplementation((cb) => {
+      mockSupabaseAdapter._resetSettingsCallback();
+      // re-capture
+      mockSupabaseAdapter._triggerSettings = (s) => cb(s);
+      return vi.fn();
+    });
   });
 
   it("starts signed out", () => {
@@ -179,5 +196,85 @@ describe("useCloudSync", () => {
     await act(async () => { await result.current.sync(); });
 
     expect(mockSupabaseAdapter.saveContractions).not.toHaveBeenCalled();
+  });
+
+  describe("mode auto-sync (primary)", () => {
+    it("saves mode immediately when mode prop changes while signed in as primary", async () => {
+      const { result, rerender } = renderHook(
+        ({ mode }) => useCloudSync({ mode }),
+        { wrapper, initialProps: { mode: "expectation" } }
+      );
+      await act(async () => { await result.current.signIn(); });
+
+      mockSupabaseAdapter.saveSettings.mockClear();
+
+      await act(async () => { rerender({ mode: "labour" }); });
+
+      expect(mockSupabaseAdapter.saveSettings).toHaveBeenCalledWith({ mode: "labour" });
+    });
+
+    it("does not auto-sync mode when not signed in", async () => {
+      const { rerender } = renderHook(
+        ({ mode }) => useCloudSync({ mode }),
+        { wrapper, initialProps: { mode: "expectation" } }
+      );
+
+      await act(async () => { rerender({ mode: "labour" }); });
+
+      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it("does not auto-sync mode when role is partner", async () => {
+      const { result, rerender } = renderHook(
+        ({ mode }) => useCloudSync({ mode }),
+        { wrapper, initialProps: { mode: "expectation" } }
+      );
+      await act(async () => { await result.current.joinAsPartner("ABC123"); });
+
+      mockSupabaseAdapter.saveSettings.mockClear();
+      await act(async () => { rerender({ mode: "labour" }); });
+
+      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mode sync (partner)", () => {
+    it("calls subscribeSettings after joining as partner", async () => {
+      const { result } = renderHook(() => useCloudSync({ onRemoteModeChange: vi.fn() }), { wrapper });
+
+      await act(async () => { await result.current.joinAsPartner("ABC123"); });
+
+      expect(mockSupabaseAdapter.subscribeSettings).toHaveBeenCalled();
+    });
+
+    it("does not call subscribeSettings after signing in as primary", async () => {
+      const { result } = renderHook(() => useCloudSync({ onRemoteModeChange: vi.fn() }), { wrapper });
+
+      await act(async () => { await result.current.signIn(); });
+
+      expect(mockSupabaseAdapter.subscribeSettings).not.toHaveBeenCalled();
+    });
+
+    it("calls onRemoteModeChange when settings subscription fires with a new mode", async () => {
+      const onRemoteModeChange = vi.fn();
+      const { result } = renderHook(() => useCloudSync({ onRemoteModeChange }), { wrapper });
+
+      await act(async () => { await result.current.joinAsPartner("ABC123"); });
+
+      act(() => { mockSupabaseAdapter._triggerSettings({ mode: "labour" }); });
+
+      expect(onRemoteModeChange).toHaveBeenCalledWith("labour");
+    });
+
+    it("does not call onRemoteModeChange when settings fire without a mode key", async () => {
+      const onRemoteModeChange = vi.fn();
+      const { result } = renderHook(() => useCloudSync({ onRemoteModeChange }), { wrapper });
+
+      await act(async () => { await result.current.joinAsPartner("ABC123"); });
+
+      act(() => { mockSupabaseAdapter._triggerSettings({ someOtherKey: "value" }); });
+
+      expect(onRemoteModeChange).not.toHaveBeenCalled();
+    });
   });
 });

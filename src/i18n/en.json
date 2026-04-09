@@ -138,7 +138,11 @@
   },
   "notifications": {
     "waterTitle": "Time to drink! 💧",
-    "waterBody": "Your water reminder interval has ended."
+    "waterBody": "Your water reminder interval has ended.",
+    "labourStarted": {
+      "title": "Labour has started!",
+      "body": "Your partner has switched to Labour mode. Head to the app."
+    }
   },
   "flags": {}
 }
