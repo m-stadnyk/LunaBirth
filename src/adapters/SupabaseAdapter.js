@@ -273,4 +273,28 @@ export class SupabaseAdapter extends DatabaseAdapter {
     if (error) throw error;
     return data?.settings ?? null;
   }
+
+  subscribeSettings(callback) {
+    let channel;
+    this.#getClient().then((sb) => {
+      if (!this.#sessionId) return;
+      channel = sb
+        .channel(`settings:${this.#sessionId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "sessions",
+            filter: `id=eq.${this.#sessionId}`,
+          },
+          (payload) => {
+            callback(payload.new?.settings ?? {});
+          }
+        )
+        .subscribe();
+    });
+
+    return () => { channel?.unsubscribe(); };
+  }
 }

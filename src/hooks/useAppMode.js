@@ -4,7 +4,7 @@ import { storage } from "../utils/storage.js";
 const KEY = "luna_mode";
 
 export function useAppMode() {
-  const [mode, setModeState] = useState("labour");
+  const [mode, setModeState] = useState("expectation");
 
   useEffect(() => {
     storage.get(KEY).then((stored) => {
