@@ -316,3 +316,11 @@ HTTPS is required for iOS PWA installation and for the browser Notification API.
 - Statistics logging
 - Configurable fun-fact popups / achievement badges
 - User info storage (v3.0)
+
+---
+
+## Custom instructions 
+
+- Update CLAUDE.md when updating existing logic/approach or adding a new feature 
+- Ask feature priority and evaluate risks of adding some complex logic to prevent bugs and tech debt 
+
