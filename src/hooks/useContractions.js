@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabase } from "../context/DatabaseContext.jsx";
 import { computePhase, computeStats } from "../utils/phaseAnalysis.js";
 import { PHASES } from "../constants/index.js";
-
-const STORAGE_KEY = "lc_c4";
 
 /**
  * Manages contraction tracking state, timers, phase detection, and persistence.
@@ -11,6 +9,7 @@ const STORAGE_KEY = "lc_c4";
  * @param {function} onPhaseChange - Called with (newPhase, suggestedDrinkMin) when phase changes.
  */
 export function useContractions({ onPhaseChange } = {}) {
+  const adapter = useDatabase();
   const [contractions, setContractions] = useState([]);
   const [activeStart, setActiveStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
@@ -19,17 +18,21 @@ export function useContractions({ onPhaseChange } = {}) {
   const [stats, setStats] = useState(null);
   const prevPhaseRef = useRef("tracking");
 
-  // Load persisted contractions on mount
+  // Load persisted contractions and subscribe to real-time updates.
+  // Re-runs when adapter changes (e.g. partner joins and adapter swaps to Supabase).
   useEffect(() => {
-    (async () => {
-      try {
-        const c = await storage.get(STORAGE_KEY);
-        if (c) setContractions(JSON.parse(c.value));
-      } catch {
-        // Storage unavailable — start fresh
-      }
-    })();
-  }, []);
+    let cancelled = false;
+    adapter.getContractions().then((data) => {
+      if (!cancelled && data?.length) setContractions(data);
+    });
+    const unsub = adapter.subscribeContractions((data) => {
+      setContractions(data);
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [adapter]);
 
   // Live elapsed timer while a contraction is active
   useEffect(() => {
@@ -71,7 +74,7 @@ export function useContractions({ onPhaseChange } = {}) {
       setActiveStart(null);
       setElapsed(0);
       try {
-        await storage.set(STORAGE_KEY, JSON.stringify(updated));
+        await adapter.saveContractions(updated);
       } catch {
         // ignore
       }
@@ -86,7 +89,7 @@ export function useContractions({ onPhaseChange } = {}) {
     prevPhaseRef.current = "tracking";
     setClearConfirm(false);
     try {
-      await storage.set(STORAGE_KEY, "[]");
+      await adapter.saveContractions([]);
     } catch {
       // ignore
     }

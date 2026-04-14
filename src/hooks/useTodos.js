@@ -1,32 +1,36 @@
 import { useState, useEffect } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabase } from "../context/DatabaseContext.jsx";
 import { sortTodos } from "../utils/todoSorter.js";
 
-const KEY = "luna_todos";
-
-function persist(todos) {
-  storage.set(KEY, JSON.stringify(todos));
-}
-
+/**
+ * Manages the todo list: CRUD operations, sorting, and persistence.
+ * Uses the active DatabaseAdapter from context so data syncs to cloud
+ * when the adapter is swapped to SupabaseAdapter.
+ */
 export function useTodos() {
+  const adapter = useDatabase();
   const [todos, setTodosRaw] = useState([]);
 
+  // Load todos and subscribe to real-time updates.
+  // Re-runs when adapter changes (e.g. partner joins and adapter swaps to Supabase).
   useEffect(() => {
-    storage.get(KEY).then((stored) => {
-      if (stored?.value) {
-        try {
-          setTodosRaw(sortTodos(JSON.parse(stored.value)));
-        } catch {
-          // corrupted data — start fresh
-        }
-      }
+    let cancelled = false;
+    adapter.getTodos().then((data) => {
+      if (!cancelled && data?.length) setTodosRaw(sortTodos(data));
     });
-  }, []);
+    const unsub = adapter.subscribeTodos((data) => {
+      setTodosRaw(sortTodos(data));
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [adapter]);
 
   const setTodos = (next) => {
     const sorted = sortTodos(next);
     setTodosRaw(sorted);
-    persist(sorted);
+    adapter.saveTodos(sorted);
   };
 
   const addTodo = (text) => {
@@ -53,10 +57,11 @@ export function useTodos() {
     setTodos(todos.map((t) => (t.id === id ? { ...t, calendarDate, calendarUrl } : t)));
 
   const clearCalendar = (id) =>
-    setTodos(todos.map((t) => (t.id === id ? { ...t, calendarDate: null, calendarUrl: null } : t)));
+    setTodos(
+      todos.map((t) => (t.id === id ? { ...t, calendarDate: null, calendarUrl: null } : t))
+    );
 
-  const removeTodo = (id) =>
-    setTodos(todos.filter((t) => t.id !== id));
+  const removeTodo = (id) => setTodos(todos.filter((t) => t.id !== id));
 
   return { todos, addTodo, toggleDone, setPriority, setCalendar, clearCalendar, removeTodo };
 }

@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabase } from "../context/DatabaseContext.jsx";
 import { DEFAULT_METHODS } from "../constants/index.js";
-
-const STORAGE_KEY = "lc_m4";
 
 /**
  * Manages the pain relief methods list: CRUD operations and persistence.
+ * Uses the active DatabaseAdapter from context so methods sync to cloud
+ * when the adapter is swapped to SupabaseAdapter.
  */
 export function useRelief() {
+  const adapter = useDatabase();
   const [methods, setMethods] = useState(DEFAULT_METHODS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
@@ -15,17 +16,17 @@ export function useRelief() {
   const [newPhases, setNewPhases] = useState(["early", "active", "transition"]);
   const [activeMethod, setActiveMethod] = useState(null);
 
-  // Load persisted methods on mount
+  // Load persisted methods on mount.
+  // Re-runs when adapter changes (e.g. partner joins and adapter swaps to Supabase).
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await storage.get(STORAGE_KEY);
-        if (r) setMethods(JSON.parse(r.value));
-      } catch {
-        // Storage unavailable — use defaults
+    let cancelled = false;
+    adapter.getSettings().then((settings) => {
+      if (!cancelled && settings?.reliefMethods) {
+        setMethods(settings.reliefMethods);
       }
-    })();
-  }, []);
+    });
+    return () => { cancelled = true; };
+  }, [adapter]);
 
   const addMethod = async () => {
     if (!newName.trim()) return;
@@ -42,7 +43,7 @@ export function useRelief() {
     setNewPhases(["early", "active", "transition"]);
     setShowAddForm(false);
     try {
-      await storage.set(STORAGE_KEY, JSON.stringify(updated));
+      await adapter.saveSettings({ reliefMethods: updated });
     } catch {
       // ignore
     }
@@ -53,7 +54,7 @@ export function useRelief() {
     setMethods(updated);
     if (activeMethod?.id === id) setActiveMethod(null);
     try {
-      await storage.set(STORAGE_KEY, JSON.stringify(updated));
+      await adapter.saveSettings({ reliefMethods: updated });
     } catch {
       // ignore
     }
@@ -64,7 +65,7 @@ export function useRelief() {
     setMethods(updated);
     setActiveMethod((prev) => (prev?.id === id ? { ...prev, mediaUrl } : prev));
     try {
-      await storage.set(STORAGE_KEY, JSON.stringify(updated));
+      await adapter.saveSettings({ reliefMethods: updated });
     } catch {
       // ignore
     }
