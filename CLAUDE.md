@@ -118,12 +118,15 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 ### State Management
 - All state lives in custom hooks in `src/hooks/`.
 - No Redux, no Zustand — plain `useState`/`useEffect`/`useRef`/`useMemo`.
-- Persistent state is loaded from `localStorage` on mount and saved on change via the async adapter in `src/utils/storage.js`.
+- Persistent state is loaded on mount and saved on change via the active `DatabaseAdapter` from `DatabaseContext`.
+- Feature hooks (`useContractions`, `useTodos`, `useHydration`, `useRelief`) call `adapter.getX()` / `adapter.saveX()` / `adapter.subscribeX()` from `useDatabase()` — never `storage.get/set` directly.
+- When adapter changes (e.g. partner joins and context swaps to `SupabaseAdapter`), hooks re-hydrate automatically because `adapter` is in their `useEffect` dependency array.
 
 ### Storage Adapters
 - `src/adapters/` contains a pluggable storage layer: `DatabaseAdapter` (abstract base), `LocalAdapter` (localStorage), `SupabaseAdapter` (cloud).
-- The active adapter is provided via `DatabaseContext` and consumed by hooks that need persistence.
+- The active adapter is provided via `DatabaseContext` and consumed by feature hooks via `useDatabase()`.
 - The app defaults to `LocalAdapter` — Supabase is only activated when the user opts into cloud sync.
+- Swapping adapters (via `setAdapter` from `DatabaseContext`) causes all feature hooks to re-load their state from the new backend and start new realtime subscriptions.
 - Tests for adapters live in `src/__tests__/adapters/`.
 
 ### Feature Flags
@@ -271,13 +274,13 @@ Prefer TDD for all new code and refactoring. The goal is to catch bugs at the ea
 - Mock Supabase client when testing `useCloudSync` or `SupabaseAdapter`.
 - Vitest environment: `jsdom`. Coverage provider: `v8`.
 
-### Current Test Coverage (26 test files)
+### Current Test Coverage (27 test files)
 | Directory | Files |
 |-----------|-------|
 | `adapters/` | LocalAdapter |
 | `components/` | DueDateCountdown, Header, MediaDisplay, ModeToggle, SettingsModal, TaskModal, TodoCard |
 | `context/` | FeatureFlagContext, LocaleContext |
-| `hooks/` | useAppMode, useCloudSync, useContractions, useDueDate, useFeatureFlags, useHydration, useLocale, useNotifications, useTodos |
+| `hooks/` | useAppMode, useCloudSync, useContractions, useDueDate, useFeatureFlags, useHydration, useLocale, useNotifications, useRelief, useTodos |
 | `utils/` | countdown, formatters, i18n, media, phaseAnalysis, todoSorter |
 
 ---

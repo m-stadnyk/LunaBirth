@@ -1,59 +1,57 @@
 import { useState, useEffect, useRef } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabase } from "../context/DatabaseContext.jsx";
 import { PHASES } from "../constants/index.js";
-
-const KEYS = {
-  drinkCount: "lc_dc",
-  lastDrank: "lc_ld",
-  drinkInterval: "lc_di",
-  intervals: "lc_iv",
-};
 
 /**
  * Manages hydration reminders: countdown timer, drink logging, interval management,
- * and phase-based drink suggestions. Persists all state to localStorage.
+ * and phase-based drink suggestions. Persists all state via the active DatabaseAdapter.
  *
  * @param {object} [opts]
  * @param {function} [opts.onDrinkAlert] - Called once when the countdown transitions to 0 (false→true).
  */
 export function useHydration({ onDrinkAlert } = {}) {
+  const adapter = useDatabase();
   const [drinkInterval, setDrinkInterval] = useState(15);
   const drinkIntervalRef = useRef(15);
   const [intervals, setIntervals] = useState([5, 15, 30]);
+  const intervalsRef = useRef([5, 15, 30]);
   const [customVal, setCustomVal] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [lastDrank, setLastDrank] = useState(Date.now());
+  const lastDrankRef = useRef(Date.now());
   const [drinkCount, setDrinkCount] = useState(0);
+  const drinkCountRef = useRef(0);
   const [secsLeft, setSecsLeft] = useState(1200);
   const [drinkAlert, setDrinkAlert] = useState(false);
   const prevAlertRef = useRef(false);
   const onDrinkAlertRef = useRef(onDrinkAlert);
   const [drinkSuggestion, setDrinkSuggestion] = useState(null);
 
-  // Load persisted hydration state on mount
+  // Load persisted hydration state on mount.
+  // Re-runs when adapter changes (e.g. partner joins and adapter swaps to Supabase).
   useEffect(() => {
-    (async () => {
-      try {
-        const dc = await storage.get(KEYS.drinkCount);
-        if (dc) setDrinkCount(+dc.value || 0);
-
-        const ld = await storage.get(KEYS.lastDrank);
-        if (ld) setLastDrank(+ld.value || Date.now());
-
-        const di = await storage.get(KEYS.drinkInterval);
-        if (di) {
-          const v = +di.value || 15;
-          setDrinkInterval(v);
-          drinkIntervalRef.current = v;
-        }
-
-        const iv = await storage.get(KEYS.intervals);
-        if (iv) setIntervals(JSON.parse(iv.value));
-      } catch {
-        // Storage unavailable — use defaults
+    let cancelled = false;
+    adapter.getHydration().then((data) => {
+      if (cancelled) return;
+      if (data.drinkCount !== undefined) {
+        setDrinkCount(data.drinkCount);
+        drinkCountRef.current = data.drinkCount;
       }
-    })();
-  }, []);
+      if (data.lastDrank !== undefined) {
+        setLastDrank(data.lastDrank);
+        lastDrankRef.current = data.lastDrank;
+      }
+      if (data.drinkInterval !== undefined) {
+        setDrinkInterval(data.drinkInterval);
+        drinkIntervalRef.current = data.drinkInterval;
+      }
+      if (data.intervals !== undefined) {
+        setIntervals(data.intervals);
+        intervalsRef.current = data.intervals;
+      }
+    });
+    return () => { cancelled = true; };
+  }, [adapter]);
 
   // Keep callback ref current so the interval closure always calls the latest version
   useEffect(() => { onDrinkAlertRef.current = onDrinkAlert; }, [onDrinkAlert]);
@@ -90,7 +88,12 @@ export function useHydration({ onDrinkAlert } = {}) {
     drinkIntervalRef.current = v;
     setDrinkSuggestion(null);
     try {
-      await storage.set(KEYS.drinkInterval, String(v));
+      await adapter.saveHydration({
+        drinkCount: drinkCountRef.current,
+        lastDrank: lastDrankRef.current,
+        drinkInterval: v,
+        intervals: intervalsRef.current,
+      });
     } catch {
       // ignore
     }
@@ -100,11 +103,19 @@ export function useHydration({ onDrinkAlert } = {}) {
     if (!v || intervals.includes(v)) return;
     const updated = [...intervals, v].sort((a, b) => a - b);
     setIntervals(updated);
+    intervalsRef.current = updated;
     setCustomVal("");
     setShowCustomInput(false);
-    await applyInterval(v);
+    setDrinkInterval(v);
+    drinkIntervalRef.current = v;
+    setDrinkSuggestion(null);
     try {
-      await storage.set(KEYS.intervals, JSON.stringify(updated));
+      await adapter.saveHydration({
+        drinkCount: drinkCountRef.current,
+        lastDrank: lastDrankRef.current,
+        drinkInterval: v,
+        intervals: updated,
+      });
     } catch {
       // ignore
     }
@@ -114,14 +125,23 @@ export function useHydration({ onDrinkAlert } = {}) {
     if (intervals.length <= 1) return; // keep at least one
     const updated = intervals.filter((i) => i !== v).sort((a, b) => a - b);
     setIntervals(updated);
+    intervalsRef.current = updated;
+    let newInterval = drinkIntervalRef.current;
     if (drinkInterval === v) {
-      const nearest = updated.reduce((a, b) =>
+      newInterval = updated.reduce((a, b) =>
         Math.abs(b - v) < Math.abs(a - v) ? b : a
       );
-      await applyInterval(nearest);
+      setDrinkInterval(newInterval);
+      drinkIntervalRef.current = newInterval;
+      setDrinkSuggestion(null);
     }
     try {
-      await storage.set(KEYS.intervals, JSON.stringify(updated));
+      await adapter.saveHydration({
+        drinkCount: drinkCountRef.current,
+        lastDrank: lastDrankRef.current,
+        drinkInterval: newInterval,
+        intervals: updated,
+      });
     } catch {
       // ignore
     }
@@ -129,14 +149,20 @@ export function useHydration({ onDrinkAlert } = {}) {
 
   const drank = async () => {
     const now = Date.now();
+    const nc = drinkCountRef.current + 1;
     setLastDrank(now);
-    const nc = drinkCount + 1;
+    lastDrankRef.current = now;
     setDrinkCount(nc);
+    drinkCountRef.current = nc;
     setDrinkAlert(false);
     prevAlertRef.current = false;
     try {
-      await storage.set(KEYS.lastDrank, String(now));
-      await storage.set(KEYS.drinkCount, String(nc));
+      await adapter.saveHydration({
+        drinkCount: nc,
+        lastDrank: now,
+        drinkInterval: drinkIntervalRef.current,
+        intervals: intervalsRef.current,
+      });
     } catch {
       // ignore
     }
