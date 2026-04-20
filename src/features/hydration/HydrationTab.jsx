@@ -98,24 +98,29 @@ export function HydrationTab({
               style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
             />
             <text
-              x={55} y={50} textAnchor="middle"
+              x={55} y={60} textAnchor="middle"
               fill={ringColor}
               style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, fontWeight: 400 }}
             >
               {drinkAlert ? "sip!" : fmtMMSS(secsLeft)}
             </text>
-            <text
-              x={55} y={67} textAnchor="middle" fill={N.muted}
-              style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 10 }}
-            >
-              {drinkAlert ? t("hydration.drinkNow") : t("hydration.untilNextSip")}
-            </text>
           </svg>
-          <div style={{ textAlign: "center", marginTop: 2 }}>
+          <p style={{
+            margin: "4px 0 0",
+            textAlign: "center",
+            fontSize: 11,
+            color: N.muted,
+            fontFamily: "'DM Sans',sans-serif",
+            lineHeight: 1.3,
+            maxWidth: 130,
+          }}>
+            {drinkAlert ? t("hydration.drinkNow") : t("hydration.untilNextSip")}
+          </p>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", flexWrap: "wrap", gap: "0 6px", marginTop: 6 }}>
             <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, color: N.gold }}>
               {drinkCount}
             </span>
-            <span style={{ color: N.muted, fontSize: 13, marginLeft: 6 }}>{t("hydration.glassesToday")}</span>
+            <span style={{ color: N.muted, fontSize: 13 }}>{t("hydration.glassesToday")}</span>
           </div>
         </div>
         <button
