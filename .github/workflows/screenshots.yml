@@ -1,0 +1,42 @@
+name: UI Screenshots
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Write access needed to push screenshots back to the PR branch.
+# Works for PRs from the same repo; forks PRs are skipped (see step below).
+permissions:
+  contents: write
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run screenshot tests
+        run: npx playwright test
+
+      - name: Commit screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add screenshots/
+          git diff --staged --quiet && echo "No screenshot changes" || \
+            git commit -m "chore: update UI screenshots [skip ci]" && git push
