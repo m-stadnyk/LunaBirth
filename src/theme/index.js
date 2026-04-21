@@ -27,6 +27,13 @@ export const N = {
   alert:       "#E07575",
 };
 
+// Font families
+export const FONTS = {
+  serif:  "'Cormorant Garamond', serif",
+  sans:   "'DM Sans', sans-serif",
+  script: "'Bad Script', cursive",
+};
+
 // Priority colour scale (gold intensity)
 export const PRIORITY_COLORS = {
   high:   "#D4A843",
