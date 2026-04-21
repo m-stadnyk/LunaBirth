@@ -1,4 +1,4 @@
-import { N } from "../theme/index.js";
+import { N, FONTS } from "../theme/index.js";
 import { ModeToggle } from "./ModeToggle.jsx";
 
 export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }) {
@@ -30,9 +30,8 @@ export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }
         </h1>
         <p
           style={{
-            fontFamily: "'Cormorant Garamond',serif",
-            fontStyle: "italic",
-            fontSize: 16,
+            fontFamily: FONTS.script,
+            fontSize: 17,
             color: N.muted,
             marginTop: 4,
             marginBottom: 0,

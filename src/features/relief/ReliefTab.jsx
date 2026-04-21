@@ -1,4 +1,4 @@
-import { N } from "../../theme/index.js";
+import { N, FONTS } from "../../theme/index.js";
 import { PHASES } from "../../constants/index.js";
 import { sortByPhase } from "../../utils/phaseAnalysis.js";
 import { Icon } from "../../components/Icon.jsx";
@@ -85,7 +85,7 @@ export function ReliefTab({
                 {t("relief.now")}
               </span>
             )}
-            <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, color: N.text, flex: 1 }}>
+            <span style={{ fontFamily: FONTS.script, fontSize: 18, color: N.text, flex: 1 }}>
               {m.name}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>

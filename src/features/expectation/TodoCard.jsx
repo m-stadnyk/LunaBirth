@@ -1,4 +1,4 @@
-import { N, PRIORITY_COLORS } from "../../theme/index.js";
+import { N, PRIORITY_COLORS, FONTS } from "../../theme/index.js";
 import { Icon } from "../../components/Icon.jsx";
 
 function formatBadgeDate(iso) {
@@ -56,7 +56,8 @@ export function TodoCard({ todo, onTap, onToggleDone }) {
         data-clamp="2"
         style={{
           flex: 1,
-          fontSize: 14,
+          fontFamily: FONTS.script,
+          fontSize: 15,
           color: todo.done ? N.muted : N.text,
           lineHeight: 1.45,
           overflow: "hidden",
