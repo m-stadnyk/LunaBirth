@@ -34,6 +34,7 @@ export function TabBar({ activeTab, onTabChange, mode }) {
         return (
           <button
             key={id}
+            data-testid={`tab-${id}`}
             onClick={() => onTabChange(id)}
             style={{
               flex: 1,
