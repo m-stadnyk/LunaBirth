@@ -11,7 +11,7 @@ export const P = {
 // Night-sky palette (full app)
 export const N = {
   bg:          "#0B1229",
-  bgImage:     "url('/theme_ref.jpg')",
+  bgGradient:  "radial-gradient(ellipse at 30% 15%, #1a2a5e 0%, #0B1229 50%, #060C1C 100%)",
   card:        "rgba(8,15,40,0.72)",
   cardSolid:   "#131D45",
   cream:       "rgba(255,255,255,0.06)",
