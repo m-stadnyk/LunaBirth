@@ -53,8 +53,11 @@ function AppInner() {
   const { affirmation, fade } = useAffirmations(locale);
   const notifications = useNotifications();
   const appUpdate = useAppUpdate();
+  const dueDate = useDueDate();
   const cloudSync = useCloudSync({
     mode,
+    dueDate: dueDate.dueDate,
+    countdownUnit: dueDate.countdownUnit,
     onRemoteModeChange: (newMode) => {
       setMode(newMode);
       if (newMode === "labour" && typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -71,7 +74,6 @@ function AppInner() {
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();
   const labourContacts = useLabourContacts();
-  const dueDate = useDueDate();
   const todos = useTodos();
 
   return (
@@ -188,6 +190,7 @@ function AppInner() {
           notifications={notifications}
           cloudSync={cloudSync}
           appUpdate={appUpdate}
+          onClearTodos={todos.clearTodos}
         />
 
         {/* Version badge — always visible at the bottom of the viewport */}

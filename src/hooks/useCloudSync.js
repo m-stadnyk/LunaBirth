@@ -11,29 +11,18 @@ const KEYS = {
   inviteCode: "luna_invite_code",
 };
 
+const HYDRATION_DEFAULTS = { drinkCount: 0, lastDrank: Date.now(), drinkInterval: 15, intervals: [5, 15, 30] };
+
 /**
  * Manages cloud authentication, session sharing, and manual sync.
  *
  * @param {object} [options]
  * @param {string} [options.mode]               Current app mode ("labour"|"expectation").
- *   When the primary user is signed in, any change to this value is immediately
- *   persisted to Supabase so the partner receives it via Realtime.
- * @param {function} [options.onRemoteModeChange]  Called with the new mode string
- *   when the partner detects that the primary has switched modes.
- *
- * Flow for primary user:
- *   1. signIn() → anonymous auth + createSession() → returns inviteCode
- *   2. Share inviteCode with partner (show in settings)
- *   3. sync() → pushes all local data to Supabase
- *
- * Flow for partner:
- *   1. joinAsPartner(code) → anonymous auth + joinSession(code)
- *   2. Data from primary becomes visible via Realtime subscriptions
- *   3. Mode changes from primary arrive via subscribeSettings → onRemoteModeChange
- *
- * Sign-out reverts the context adapter back to LocalAdapter.
+ * @param {string} [options.dueDate]            Current due date ISO string.
+ * @param {string} [options.countdownUnit]      Current countdown unit preference.
+ * @param {function} [options.onRemoteModeChange]  Called when partner detects primary switched modes.
  */
-export function useCloudSync({ mode, onRemoteModeChange } = {}) {
+export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange } = {}) {
   const { setAdapter } = useContext(DatabaseContext);
 
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -44,11 +33,7 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
   const [lastSynced, setLastSynced] = useState(null);
   const [error, setError] = useState(null);
 
-  // Holds the active SupabaseAdapter instance so we can call saveSettings / subscribeSettings
-  // without needing to instantiate a new adapter (which wouldn't have #sessionId set).
   const adapterRef = useRef(null);
-
-  // Holds the unsubscribe function for the settings Realtime channel.
   const settingsUnsubRef = useRef(null);
 
   // ── Settings subscription (partner) ─────────────────────────────────────────
@@ -81,8 +66,6 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
         try {
           const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
           const adapter = new SupabaseAdapter();
-          // The Supabase SDK auto-restores the auth session from its own localStorage
-          // key on client creation. Verify it's still valid before proceeding.
           const user = await adapter.getCurrentUser();
           if (!user) throw new Error("Session expired");
 
@@ -107,13 +90,21 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-sync mode for primary ────────────────────────────────────────────────
-  // Whenever the primary user changes mode, push it to Supabase immediately so
-  // the partner receives the update via Realtime.
 
   useEffect(() => {
     if (!isSignedIn || role !== "primary" || !mode || !adapterRef.current) return;
     adapterRef.current.saveSettings({ mode }).catch(() => {});
   }, [mode, isSignedIn, role]);
+
+  // ── Auto-sync dueDate + countdownUnit for primary ─────────────────────────────
+  // useDueDate writes directly to localStorage (bypasses the adapter), so we
+  // mirror changes to Supabase here whenever the primary is signed in.
+
+  useEffect(() => {
+    if (!isSignedIn || role !== "primary" || !adapterRef.current) return;
+    if (dueDate === undefined && countdownUnit === undefined) return;
+    adapterRef.current.saveSettings({ dueDate, countdownUnit }).catch(() => {});
+  }, [dueDate, countdownUnit, isSignedIn, role]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────────
 
@@ -137,22 +128,22 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
       const { userId } = await adapter.signInAnonymously();
       const { sessionId: sid, inviteCode: code } = await adapter.createSession();
 
-      // Push existing local data to cloud immediately after creating session
+      // Push all local data to cloud immediately after creating session
       const local = new LocalAdapter();
-      const [contractions, hydration, todos, settings] = await Promise.all([
+      const [contractions, hydration, todos, settings, contacts] = await Promise.all([
         local.getContractions(),
         local.getHydration(),
         local.getTodos(),
         local.getSettings(),
+        local.getContacts(),
       ]);
 
-      // Set the session on the new adapter before saving
-      // (SupabaseAdapter tracks sessionId internally after createSession)
       await Promise.all([
         adapter.saveContractions(contractions),
         adapter.saveHydration(hydration ?? {}),
         adapter.saveTodos(todos),
         adapter.saveSettings({ ...(settings ?? {}), mode }),
+        adapter.saveContacts(contacts),
       ]);
 
       const now = Date.now();
@@ -166,6 +157,20 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
 
       adapterRef.current = adapter;
       setAdapter(adapter);
+
+      // Best-effort: clear local copies now that data lives in the cloud.
+      // Settings keys are intentionally excluded — useAppMode/useDueDate read them directly.
+      try {
+        await Promise.all([
+          local.saveTodos([]),
+          local.saveContractions([]),
+          local.saveContacts([]),
+          local.saveHydration({ drinkCount: 0, lastDrank: Date.now(), drinkInterval: 15, intervals: [5, 15, 30] }),
+        ]);
+      } catch {
+        // Cleanup is best-effort; ignore any errors
+      }
+
       setIsSignedIn(true);
       setSessionId(sid);
       setInviteCode(code);
@@ -251,6 +256,39 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
   const signOut = useCallback(async () => {
     setError(null);
 
+    // ── Cloud → Local migration ────────────────────────────────────────────────
+    // Fetch all cloud data before disconnecting so the user retains their data
+    // in local mode. Uses adapterRef.current (has #sessionId); skip if null.
+    // One LocalAdapter instance is created here and reused for setAdapter below.
+    const localAdapter = new LocalAdapter();
+    if (adapterRef.current) {
+      try {
+        const [contractions, hydration, todos, contacts, cloudSettings, localSettings] =
+          await Promise.all([
+            adapterRef.current.getContractions(),
+            adapterRef.current.getHydration(),
+            adapterRef.current.getTodos(),
+            adapterRef.current.getContacts(),
+            adapterRef.current.getSettings(),
+            localAdapter.getSettings(),
+          ]);
+        await Promise.all([
+          localAdapter.saveContractions(contractions ?? []),
+          localAdapter.saveHydration(hydration ?? { ...HYDRATION_DEFAULTS, lastDrank: Date.now() }),
+          localAdapter.saveTodos(todos ?? []),
+          localAdapter.saveContacts(contacts ?? []),
+          // Merge: prefer local values for adapter-bypassing fields (dueDate, mode, locale,
+          // countdownUnit, flags); take reliefMethods from cloud since useRelief is adapter-managed.
+          localAdapter.saveSettings({
+            ...(localSettings ?? {}),
+            reliefMethods: cloudSettings?.reliefMethods,
+          }),
+        ]);
+      } catch {
+        // Migration is best-effort — proceed with sign-out regardless
+      }
+    }
+
     // Tear down settings subscription before clearing state
     if (settingsUnsubRef.current) {
       settingsUnsubRef.current();
@@ -275,7 +313,7 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
     ]);
 
     adapterRef.current = null;
-    setAdapter(new LocalAdapter());
+    setAdapter(localAdapter); // reuse the instance that received migrated data
     setIsSignedIn(false);
     setSessionId(null);
     setInviteCode(null);

@@ -8,6 +8,7 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'npm run build && npm run preview',

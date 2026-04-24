@@ -29,8 +29,11 @@ export function useTodos() {
 
   const setTodos = (next) => {
     const sorted = sortTodos(next);
+    const previous = todos;
     setTodosRaw(sorted);
-    adapter.saveTodos(sorted);
+    adapter.saveTodos(sorted).catch(() => {
+      setTodosRaw(previous);
+    });
   };
 
   const addTodo = (text) => {
@@ -63,5 +66,7 @@ export function useTodos() {
 
   const removeTodo = (id) => setTodos(todos.filter((t) => t.id !== id));
 
-  return { todos, addTodo, toggleDone, setPriority, setCalendar, clearCalendar, removeTodo };
+  const clearTodos = () => setTodos([]);
+
+  return { todos, addTodo, toggleDone, setPriority, setCalendar, clearCalendar, removeTodo, clearTodos };
 }
