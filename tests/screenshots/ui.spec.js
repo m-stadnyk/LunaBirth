@@ -63,3 +63,25 @@ for (const locale of LOCALES) {
     });
   }
 }
+
+for (const locale of LOCALES) {
+  test(`${locale}/settings`, async ({ page }) => {
+    const storage = buildStorage(locale, 'labour');
+
+    await page.addInitScript((s) => {
+      for (const [k, v] of Object.entries(s)) localStorage.setItem(k, v);
+    }, storage);
+
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.locator('h2').waitFor({ state: 'visible' });
+
+    mkdirSync(`screenshots/${locale}`, { recursive: true });
+    await page.screenshot({
+      path: `screenshots/${locale}/settings.png`,
+      fullPage: false,
+    });
+  });
+}
