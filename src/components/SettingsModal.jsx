@@ -285,7 +285,69 @@ function CloudSyncSection({ cloudSync, t }) {
   );
 }
 
-export function SettingsModal({ open, onClose, notifications, cloudSync }) {
+function AppVersionSection({ appUpdate, t }) {
+  const { status, checkForUpdates } = appUpdate;
+
+  const statusText = {
+    checking: t("settings.updateChecking"),
+    upToDate: t("settings.updateUpToDate"),
+    updating: t("settings.updateAvailable"),
+  }[status] ?? null;
+
+  return (
+    <>
+      <SectionLabel>{t("settings.appVersionLabel")}</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          style={{
+            background: N.cream,
+            border: `1px solid ${N.border}`,
+            borderRadius: 10,
+            padding: "12px 16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ color: N.text, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>
+            v{__APP_VERSION__}
+          </span>
+          <button
+            onClick={checkForUpdates}
+            disabled={status !== "idle"}
+            style={{
+              background: "none",
+              border: `1px solid ${N.border}`,
+              borderRadius: 8,
+              padding: "6px 12px",
+              fontSize: 13,
+              color: status !== "idle" ? N.muted : N.text,
+              cursor: status !== "idle" ? "not-allowed" : "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >
+            {status === "checking"
+              ? t("settings.updateChecking")
+              : t("settings.checkForUpdates")}
+          </button>
+        </div>
+        {statusText && status !== "checking" && (
+          <p
+            style={{
+              margin: "0 0 0 4px",
+              fontSize: 12,
+              color: status === "updating" ? N.gold : N.muted,
+            }}
+          >
+            {statusText}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+export function SettingsModal({ open, onClose, notifications, cloudSync, appUpdate }) {
   const { locale, setLocale, t, supportedLocales } = useLocaleContext();
   const { flags, setFlag, flagDefs } = useFeatureFlags();
 
@@ -384,6 +446,13 @@ export function SettingsModal({ open, onClose, notifications, cloudSync }) {
               />
             ))}
           </div>
+        )}
+
+        {appUpdate && (
+          <>
+            <SectionDivider />
+            <AppVersionSection appUpdate={appUpdate} t={t} />
+          </>
         )}
       </div>
     </div>

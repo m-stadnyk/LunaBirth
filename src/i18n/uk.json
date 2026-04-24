@@ -134,7 +134,12 @@
     "cloudSyncSignedIn": "Синхронізовано з хмарою",
     "cloudSyncPrivacyNote": "Обліковий запис не потрібен. Дані зберігаються анонімно.",
     "cloudSyncSyncNow": "Синхронізувати",
-    "cloudSyncRolePartner": "Підключено як партнер"
+    "cloudSyncRolePartner": "Підключено як партнер",
+    "appVersionLabel": "Версія застосунку",
+    "checkForUpdates": "Перевірити оновлення",
+    "updateChecking": "Перевірка…",
+    "updateUpToDate": "У вас остання версія",
+    "updateAvailable": "Знайдено оновлення — перезавантаження…"
   },
   "notifications": {
     "waterTitle": "Час пити! 💧",
