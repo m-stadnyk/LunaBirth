@@ -10,6 +10,7 @@ import { useRelief } from "./hooks/useRelief.js";
 import { useLabourContacts } from "./hooks/useLabourContacts.js";
 import { useNotifications } from "./hooks/useNotifications.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
+import { useAppUpdate } from "./hooks/useAppUpdate.js";
 import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
 import { FeatureFlagProvider } from "./context/FeatureFlagContext.jsx";
 import { DatabaseProvider } from "./context/DatabaseContext.jsx";
@@ -51,6 +52,7 @@ function AppInner() {
 
   const { affirmation, fade } = useAffirmations(locale);
   const notifications = useNotifications();
+  const appUpdate = useAppUpdate();
   const cloudSync = useCloudSync({
     mode,
     onRemoteModeChange: (newMode) => {
@@ -185,7 +187,24 @@ function AppInner() {
           onClose={() => setSettingsOpen(false)}
           notifications={notifications}
           cloudSync={cloudSync}
+          appUpdate={appUpdate}
         />
+
+        {/* Version badge — always visible at the bottom of the viewport */}
+        <div
+          style={{
+            position: "fixed",
+            bottom: 6,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1,
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontSize: 10, color: N.muted, opacity: 0.4, letterSpacing: "0.04em" }}>
+            v{__APP_VERSION__}
+          </span>
+        </div>
 
         <LabourContactsModal
           open={contactsOpen}

@@ -320,7 +320,17 @@ npm run build             # Output in dist/
 # - GitHub Pages: push dist/ to gh-pages branch
 ```
 
+**Automated deployment:** The production app is deployed via Netlify with continuous deployment. Pushes to the `main` branch automatically trigger a new Netlify build and publish. No manual `dist/` upload is needed for production — just merge to `main`.
+
 HTTPS is required for iOS PWA installation and for the browser Notification API. Use Netlify/Vercel or the `--https` flag in `build-and-serve.sh` for local testing.
+
+### App Versioning
+
+- The app version is defined in `package.json` (`version` field).
+- Vite injects it as `__APP_VERSION__` at build time (via `define` in `vite.config.js`).
+- The version is displayed as a fixed badge at the bottom of every screen.
+- Users can check for PWA updates via the "Check for Updates" button in Settings → App Version.
+- The update check calls `ServiceWorkerRegistration.update()`. Because `registerType: "autoUpdate"` is set, any new service worker skips waiting and immediately takes control, triggering a page reload.
 
 ---
 

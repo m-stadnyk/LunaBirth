@@ -134,7 +134,12 @@
     "cloudSyncSignedIn": "Synced to cloud",
     "cloudSyncPrivacyNote": "No account needed. Your data is stored anonymously.",
     "cloudSyncSyncNow": "Sync now",
-    "cloudSyncRolePartner": "Connected as partner"
+    "cloudSyncRolePartner": "Connected as partner",
+    "appVersionLabel": "App Version",
+    "checkForUpdates": "Check for Updates",
+    "updateChecking": "Checking…",
+    "updateUpToDate": "You're up to date",
+    "updateAvailable": "Update found — reloading…"
   },
   "notifications": {
     "waterTitle": "Time to drink! 💧",
