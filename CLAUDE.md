@@ -332,6 +332,25 @@ HTTPS is required for iOS PWA installation and for the browser Notification API.
 - Users can check for PWA updates via the "Check for Updates" button in Settings → App Version.
 - The update check calls `ServiceWorkerRegistration.update()`. Because `registerType: "autoUpdate"` is set, any new service worker skips waiting and immediately takes control, triggering a page reload.
 
+#### Automated version bumping (CI)
+
+- `.github/workflows/bump-version.yml` runs on every PR targeting `main`.
+- It compares the PR branch version against `main`. If they match, it auto-bumps the **patch** segment (`npm version patch --no-git-tag-version`) and commits `package.json` + `package-lock.json` back to the PR branch.
+- If the branch already carries a manually-bumped version (minor or major), the action skips the bump — the human decision is respected.
+- The commit message format is `chore: bump version X.Y.Z → X.Y.Z+1`; the action also ignores commits with that prefix to avoid infinite loops.
+
+#### When to bump manually
+
+Use `npm version <patch|minor|major> --no-git-tag-version` before opening a PR when:
+
+| Change type | Version segment |
+|-------------|----------------|
+| Bug fixes, copy changes, style tweaks | `patch` (auto-bumped by CI if you skip this) |
+| New feature or notable UX addition | `minor` |
+| Breaking change, major redesign, large new section | `major` |
+
+**Suggestion cadence:** After every meaningful feature branch, verify the version in `package.json` is intentional before merging. For pure chore/docs branches it is fine to let CI handle the patch bump automatically.
+
 ---
 
 ## Roadmap (TODO.md)
