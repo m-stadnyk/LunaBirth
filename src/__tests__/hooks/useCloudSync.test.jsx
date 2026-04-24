@@ -12,6 +12,8 @@ const mockSupabaseAdapter = vi.hoisted(() => {
   return {
     signInAnonymously: vi.fn(async () => ({ userId: "user-abc" })),
     signOut: vi.fn(async () => {}),
+    getCurrentUser: vi.fn(async () => ({ userId: "user-abc", role: "primary" })),
+    restoreSession: vi.fn(),
     createSession: vi.fn(async () => ({ sessionId: "sess-123", inviteCode: "ABC123" })),
     joinSession: vi.fn(async () => ({ sessionId: "sess-456" })),
     saveContractions: vi.fn(async () => {}),
@@ -65,6 +67,8 @@ describe("useCloudSync", () => {
     mockSupabaseAdapter._resetSettingsCallback();
     // Restore defaults after clearAllMocks
     mockSupabaseAdapter.signInAnonymously.mockResolvedValue({ userId: "user-abc" });
+    mockSupabaseAdapter.getCurrentUser.mockResolvedValue({ userId: "user-abc", role: "primary" });
+    mockSupabaseAdapter.restoreSession.mockImplementation(() => {});
     mockSupabaseAdapter.createSession.mockResolvedValue({ sessionId: "sess-123", inviteCode: "ABC123" });
     mockSupabaseAdapter.joinSession.mockResolvedValue({ sessionId: "sess-456" });
     mockSupabaseAdapter.signOut.mockResolvedValue();
@@ -85,6 +89,74 @@ describe("useCloudSync", () => {
     expect(result.current.isSignedIn).toBe(false);
     expect(result.current.role).toBeNull();
     expect(result.current.inviteCode).toBeNull();
+  });
+
+  describe("session restore on mount", () => {
+    async function mockStoredSession(overrides = {}) {
+      const { storage } = await import("../../utils/storage.js");
+      const defaults = {
+        luna_cloud_uid: { value: "user-abc" },
+        luna_session_id: { value: "sess-123" },
+        luna_user_role: { value: "primary" },
+        luna_cloud_last_sync: { value: "1712262400000" },
+        luna_invite_code: { value: "ABC123" },
+        ...overrides,
+      };
+      storage.get.mockImplementation(async (key) => defaults[key] ?? null);
+    }
+
+    it("restores session from storage on mount without calling signInAnonymously", async () => {
+      await mockStoredSession();
+      const { result } = renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+      expect(mockSupabaseAdapter.signInAnonymously).not.toHaveBeenCalled();
+      expect(result.current.isSignedIn).toBe(true);
+      expect(result.current.sessionId).toBe("sess-123");
+      expect(result.current.role).toBe("primary");
+      expect(result.current.inviteCode).toBe("ABC123");
+    });
+
+    it("calls restoreSession with the persisted sessionId and role so getTodos works", async () => {
+      await mockStoredSession();
+      renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+      expect(mockSupabaseAdapter.restoreSession).toHaveBeenCalledWith("sess-123", "primary");
+    });
+
+    it("stays in local mode when storage has no uid/sessionId", async () => {
+      const { storage } = await import("../../utils/storage.js");
+      storage.get.mockResolvedValue(null);
+
+      const { result } = renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+      expect(result.current.isSignedIn).toBe(false);
+      expect(mockSupabaseAdapter.restoreSession).not.toHaveBeenCalled();
+    });
+
+    it("stays in local mode when getCurrentUser returns null (expired session)", async () => {
+      await mockStoredSession();
+      mockSupabaseAdapter.getCurrentUser.mockResolvedValueOnce(null);
+
+      const { result } = renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+      expect(result.current.isSignedIn).toBe(false);
+      expect(mockSupabaseAdapter.restoreSession).not.toHaveBeenCalled();
+    });
+
+    it("restores partner role and sets up settings subscription", async () => {
+      await mockStoredSession({ luna_user_role: { value: "partner" } });
+
+      const onRemoteModeChange = vi.fn();
+      const { result } = renderHook(() => useCloudSync({ onRemoteModeChange }), { wrapper });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+      expect(result.current.role).toBe("partner");
+      expect(mockSupabaseAdapter.subscribeSettings).toHaveBeenCalled();
+    });
   });
 
   it("signIn: authenticates, creates session, sets isSignedIn and inviteCode", async () => {

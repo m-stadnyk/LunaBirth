@@ -78,19 +78,20 @@ export function useCloudSync({ mode, onRemoteModeChange } = {}) {
       ]);
 
       if (uid?.value && sid?.value) {
-        // Re-hydrate the SupabaseAdapter with the persisted session
         try {
           const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
           const adapter = new SupabaseAdapter();
-          await adapter.signInAnonymously();
-          // Restore internal session state via joinSession/createSession is not ideal;
-          // instead we set a flag and let the adapter reconstruct lazily.
-          // For now, mark as signed in and let the user re-sync if needed.
+          // The Supabase SDK auto-restores the auth session from its own localStorage
+          // key on client creation. Verify it's still valid before proceeding.
+          const user = await adapter.getCurrentUser();
+          if (!user) throw new Error("Session expired");
+
+          const restoredRole = r?.value ?? "primary";
+          adapter.restoreSession(sid.value, restoredRole);
           adapterRef.current = adapter;
           setAdapter(adapter);
           setIsSignedIn(true);
           setSessionId(sid.value);
-          const restoredRole = r?.value ?? "primary";
           setRole(restoredRole);
           setLastSynced(ls?.value ? +ls.value : null);
           setInviteCode(ic?.value ?? null);
