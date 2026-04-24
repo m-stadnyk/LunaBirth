@@ -285,6 +285,90 @@ function CloudSyncSection({ cloudSync, t }) {
   );
 }
 
+function DataSection({ onClearTodos, t }) {
+  const [confirming, setConfirming] = useState(false);
+
+  const handleClear = () => {
+    onClearTodos();
+    setConfirming(false);
+  };
+
+  return (
+    <>
+      <SectionLabel>{t("settings.dataLabel")}</SectionLabel>
+      {!confirming ? (
+        <button
+          onClick={() => setConfirming(true)}
+          style={{
+            background: "none",
+            border: `1px solid ${N.alert}`,
+            borderRadius: 10,
+            padding: "10px 16px",
+            fontSize: 14,
+            color: N.alert,
+            cursor: "pointer",
+            textAlign: "left",
+            width: "100%",
+          }}
+        >
+          {t("settings.clearTodosBtn")}
+        </button>
+      ) : (
+        <div
+          style={{
+            background: N.cream,
+            border: `1px solid ${N.alert}`,
+            borderRadius: 10,
+            padding: "12px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <p style={{ margin: 0, color: N.text, fontSize: 14 }}>
+            {t("settings.clearTodosConfirmText")}
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleClear}
+              style={{
+                flex: 1,
+                background: N.alert,
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 12px",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              {t("settings.clearTodosYes")}
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              style={{
+                flex: 1,
+                background: "none",
+                color: N.muted,
+                border: `1px solid ${N.border}`,
+                borderRadius: 8,
+                padding: "8px 12px",
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              {t("settings.clearTodosCancel")}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function AppVersionSection({ appUpdate, t }) {
   const { status, checkForUpdates } = appUpdate;
 
@@ -347,7 +431,7 @@ function AppVersionSection({ appUpdate, t }) {
   );
 }
 
-export function SettingsModal({ open, onClose, notifications, cloudSync, appUpdate }) {
+export function SettingsModal({ open, onClose, notifications, cloudSync, appUpdate, onClearTodos }) {
   const { locale, setLocale, t, supportedLocales } = useLocaleContext();
   const { flags, setFlag, flagDefs } = useFeatureFlags();
 
@@ -446,6 +530,13 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
               />
             ))}
           </div>
+        )}
+
+        {onClearTodos && (
+          <>
+            <SectionDivider />
+            <DataSection onClearTodos={onClearTodos} t={t} />
+          </>
         )}
 
         {appUpdate && (

@@ -66,5 +66,7 @@ export function useTodos() {
 
   const removeTodo = (id) => setTodos(todos.filter((t) => t.id !== id));
 
-  return { todos, addTodo, toggleDone, setPriority, setCalendar, clearCalendar, removeTodo };
+  const clearTodos = () => setTodos([]);
+
+  return { todos, addTodo, toggleDone, setPriority, setCalendar, clearCalendar, removeTodo, clearTodos };
 }

@@ -320,6 +320,45 @@ describe("useTodos", () => {
     });
   });
 
+  describe("clearTodos", () => {
+    it("removes all todos", async () => {
+      const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
+      await act(async () => {});
+      await act(async () => { result.current.addTodo("task one"); });
+      await act(async () => { result.current.addTodo("task two"); });
+      expect(result.current.todos).toHaveLength(2);
+
+      await act(async () => { result.current.clearTodos(); });
+
+      expect(result.current.todos).toHaveLength(0);
+    });
+
+    it("persists the empty list via adapter", async () => {
+      const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
+      await act(async () => {});
+      await act(async () => { result.current.addTodo("task"); });
+      adapter.saveTodos.mockClear();
+
+      await act(async () => { result.current.clearTodos(); });
+
+      expect(adapter.saveTodos).toHaveBeenCalledWith([]);
+    });
+
+    it("reverts to previous todos when saveTodos rejects on clearTodos", async () => {
+      adapter.saveTodos
+        .mockResolvedValueOnce(undefined) // addTodo succeeds
+        .mockRejectedValueOnce(new Error("RLS error")); // clearTodos fails
+
+      const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
+      await act(async () => {});
+      await act(async () => { result.current.addTodo("task"); });
+
+      await act(async () => { result.current.clearTodos(); });
+
+      expect(result.current.todos).toHaveLength(1);
+    });
+  });
+
   describe("removeTodo", () => {
     it("removes the todo with the given id", async () => {
       const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });

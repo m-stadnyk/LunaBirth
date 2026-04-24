@@ -188,6 +188,7 @@ function AppInner() {
           notifications={notifications}
           cloudSync={cloudSync}
           appUpdate={appUpdate}
+          onClearTodos={todos.clearTodos}
         />
 
         {/* Version badge — always visible at the bottom of the viewport */}
