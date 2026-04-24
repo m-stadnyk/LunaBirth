@@ -92,28 +92,14 @@ export class SupabaseAdapter extends DatabaseAdapter {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) throw new Error("Must be signed in to join a session");
 
-    // Look up the session by invite code
-    const { data: session, error: fetchErr } = await sb
-      .from("sessions")
-      .select("id, partner_ids")
-      .eq("invite_code", inviteCode.toUpperCase())
-      .single();
+    const { data: sessionId, error } = await sb
+      .rpc("join_session", { p_invite_code: inviteCode });
 
-    if (fetchErr || !session) throw new Error("Invalid invite code");
+    if (error) throw new Error("Invalid invite code");
 
-    // Add this user to partner_ids if not already present
-    const partnerIds = session.partner_ids ?? [];
-    if (!partnerIds.includes(user.id)) {
-      const { error: updateErr } = await sb
-        .from("sessions")
-        .update({ partner_ids: [...partnerIds, user.id] })
-        .eq("id", session.id);
-      if (updateErr) throw updateErr;
-    }
-
-    this.#sessionId = session.id;
+    this.#sessionId = sessionId;
     this.#role = "partner";
-    return { sessionId: session.id };
+    return { sessionId };
   }
 
   async getSessionId() {

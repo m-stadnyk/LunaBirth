@@ -32,9 +32,34 @@ CREATE POLICY "owner_full_access_sessions" ON sessions
 CREATE POLICY "partner_read_sessions" ON sessions
   FOR SELECT USING (auth.uid() = ANY(partner_ids));
 
--- Anyone signed in can look up a session by invite_code to join
-CREATE POLICY "anyone_read_by_invite_code" ON sessions
-  FOR SELECT USING (true);  -- filtered to specific invite_code in application code
+-- join_session: partners call this RPC to look up and join a session by invite code.
+-- SECURITY DEFINER runs as the function owner, bypassing RLS for the lookup + update,
+-- so a not-yet-partner user can add themselves without requiring a permissive policy.
+CREATE OR REPLACE FUNCTION join_session(p_invite_code TEXT)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_session_id UUID;
+BEGIN
+  SELECT id INTO v_session_id
+  FROM sessions
+  WHERE invite_code = upper(p_invite_code);
+
+  IF v_session_id IS NULL THEN
+    RAISE EXCEPTION 'Invalid invite code';
+  END IF;
+
+  UPDATE sessions
+  SET partner_ids = array_append(partner_ids, auth.uid())
+  WHERE id = v_session_id
+    AND NOT (auth.uid() = ANY(partner_ids));
+
+  RETURN v_session_id;
+END;
+$$;
 
 -- ─── Contraction snapshots ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS contraction_snapshots (
@@ -112,6 +137,30 @@ CREATE POLICY "partner_read_todos" ON todo_snapshots
 
 CREATE TRIGGER todo_snapshots_updated_at
   BEFORE UPDATE ON todo_snapshots
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ─── Contact snapshots ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS contact_snapshots (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE UNIQUE,
+  data        JSONB NOT NULL DEFAULT '[]',
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE contact_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "owner_full_access_contacts" ON contact_snapshots
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM sessions WHERE id = session_id AND owner_id = auth.uid())
+  );
+
+CREATE POLICY "partner_read_contacts" ON contact_snapshots
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM sessions WHERE id = session_id AND auth.uid() = ANY(partner_ids))
+  );
+
+CREATE TRIGGER contact_snapshots_updated_at
+  BEFORE UPDATE ON contact_snapshots
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ─── Enable Realtime on snapshot tables ───────────────────────────────────────
