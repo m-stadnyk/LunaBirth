@@ -29,8 +29,11 @@ export function useTodos() {
 
   const setTodos = (next) => {
     const sorted = sortTodos(next);
+    const previous = todos;
     setTodosRaw(sorted);
-    adapter.saveTodos(sorted);
+    adapter.saveTodos(sorted).catch(() => {
+      setTodosRaw(previous);
+    });
   };
 
   const addTodo = (text) => {
