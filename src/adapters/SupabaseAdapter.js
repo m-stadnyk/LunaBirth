@@ -64,6 +64,11 @@ export class SupabaseAdapter extends DatabaseAdapter {
     return { userId: user.id, role: this.#role ?? "primary" };
   }
 
+  restoreSession(sessionId, role) {
+    this.#sessionId = sessionId;
+    this.#role = role ?? "primary";
+  }
+
   // ─── Session ───────────────────────────────────────────────────────────────
 
   async createSession() {
