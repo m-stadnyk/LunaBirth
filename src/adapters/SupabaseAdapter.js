@@ -247,6 +247,32 @@ export class SupabaseAdapter extends DatabaseAdapter {
     return () => { channel?.unsubscribe(); };
   }
 
+  // ─── Labour Contacts ───────────────────────────────────────────────────────
+
+  async saveContacts(contacts) {
+    const sb = await this.#getClient();
+    if (!this.#sessionId) throw new Error("No active session");
+
+    const { error } = await sb
+      .from("contact_snapshots")
+      .upsert({ session_id: this.#sessionId, data: contacts }, { onConflict: "session_id" });
+    if (error) throw error;
+  }
+
+  async getContacts() {
+    const sb = await this.#getClient();
+    if (!this.#sessionId) return [];
+
+    const { data, error } = await sb
+      .from("contact_snapshots")
+      .select("data")
+      .eq("session_id", this.#sessionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.data ?? [];
+  }
+
   // ─── Settings ──────────────────────────────────────────────────────────────
 
   async saveSettings(settings) {

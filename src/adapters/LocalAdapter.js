@@ -14,6 +14,7 @@ const LS_KEYS = {
   countdownUnit: "luna_countdown_unit",
   todos: "luna_todos",
   flags: "luna_flags",
+  labourContacts: "luna_contacts",
 };
 
 /**
@@ -120,6 +121,18 @@ export class LocalAdapter extends DatabaseAdapter {
     if (reliefMethods !== undefined) ops.push(storage.set(LS_KEYS.reliefMethods, JSON.stringify(reliefMethods)));
     if (flags !== undefined) ops.push(storage.set(LS_KEYS.flags, JSON.stringify(flags)));
     await Promise.all(ops);
+  }
+
+  // ─── Labour Contacts ───────────────────────────────────────────────────────
+
+  async saveContacts(contacts) {
+    await storage.set(LS_KEYS.labourContacts, JSON.stringify(contacts));
+  }
+
+  async getContacts() {
+    const stored = await storage.get(LS_KEYS.labourContacts);
+    if (!stored?.value) return [];
+    try { return JSON.parse(stored.value); } catch { return []; }
   }
 
   async getSettings() {
