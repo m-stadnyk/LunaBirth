@@ -62,13 +62,15 @@ src/
 │   ├── useLocale.js        # Language switching (en/uk)
 │   ├── useNotifications.js # Browser Notification API for water reminders
 │   ├── useRelief.js        # CRUD for pain relief methods, phase filtering
-│   └── useTodos.js         # Todo list with priority, calendar dates, sorting
+│   ├── useTodos.js         # Todo list with priority, calendar dates, sorting
+│   └── useLabourContacts.js # CRUD for labour contacts (nickname + phone), localStorage + Supabase
 ├── components/             # Shared UI
 │   ├── Icon.jsx            # 13 inline SVG icons
 │   ├── Header.jsx          # Title, affirmation, mode toggle, settings button
 │   ├── TabBar.jsx          # Tab navigation (different tabs per mode)
 │   ├── ModeToggle.jsx      # Labour (✦) ↔ Expecting (☽) switcher
 │   ├── SettingsModal.jsx   # Language, notifications, cloud sync, feature flags
+│   ├── LabourContactsModal.jsx # Contacts popup: add/remove/call (tel: links), Contact Picker API on Android
 │   ├── MethodModal.jsx     # Full-screen relief method viewer with media
 │   ├── MediaDisplay.jsx    # YouTube / Spotify / image / link embeds
 │   └── MediaInlineEditor.jsx # Text input for editing media URLs
@@ -163,6 +165,7 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 | `luna_countdown_unit` | Countdown display unit (`wks_days` / `days` / `hours`) |
 | `luna_todos` | Task list array |
 | `luna_flags` | Feature flags JSON object |
+| `luna_contacts` | Labour contacts array |
 | `luna_notif_water` | Water notifications enabled: `"1"` or `"0"` |
 | `luna_cloud_uid` | Supabase user ID (cloud sync only) |
 | `luna_session_id` | Cloud session ID (cloud sync only) |

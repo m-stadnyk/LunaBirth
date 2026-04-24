@@ -7,6 +7,7 @@ import { useContractions } from "./hooks/useContractions.js";
 import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
+import { useLabourContacts } from "./hooks/useLabourContacts.js";
 import { useNotifications } from "./hooks/useNotifications.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
@@ -16,6 +17,7 @@ import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
 import { SettingsModal } from "./components/SettingsModal.jsx";
+import { LabourContactsModal } from "./components/LabourContactsModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
 import { ReliefTab } from "./features/relief/ReliefTab.jsx";
@@ -40,6 +42,7 @@ function AppInner() {
   const { mode, setMode, toggleMode } = useAppMode();
   const [tab, setTab] = useState("contractions");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
 
   // When mode changes, switch to the appropriate default tab
   useEffect(() => {
@@ -65,6 +68,7 @@ function AppInner() {
   const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
   const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
   const relief = useRelief();
+  const labourContacts = useLabourContacts();
   const dueDate = useDueDate();
   const todos = useTodos();
 
@@ -88,6 +92,7 @@ function AppInner() {
           fade={fade}
           mode={mode}
           onToggleMode={toggleMode}
+          onOpenContacts={() => setContactsOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <TabBar activeTab={tab} onTabChange={setTab} mode={mode} />
@@ -180,6 +185,12 @@ function AppInner() {
           onClose={() => setSettingsOpen(false)}
           notifications={notifications}
           cloudSync={cloudSync}
+        />
+
+        <LabourContactsModal
+          open={contactsOpen}
+          onClose={() => setContactsOpen(false)}
+          {...labourContacts}
         />
       </div>
     </>
