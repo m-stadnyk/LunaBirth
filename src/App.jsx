@@ -23,7 +23,7 @@ import { ExpectationTab } from "./features/expectation/ExpectationTab.jsx";
 
 const GLOBAL_STYLES = `
   * { box-sizing: border-box; }
-  body { margin: 0; background: ${N.bg}; }
+  body { margin: 0; background: ${N.bgGradient}; background-attachment: fixed; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: ${N.border}; border-radius: 4px; }
   @keyframes pulse {
@@ -74,7 +74,7 @@ function AppInner() {
       <div
         style={{
           fontFamily: "'DM Sans',sans-serif",
-          background: `${N.bgImage} center/cover fixed, ${N.bg}`,
+          background: N.bgGradient,
           minHeight: "100vh",
           maxWidth: 420,
           margin: "0 auto",
