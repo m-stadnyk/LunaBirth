@@ -144,5 +144,15 @@
       "body": "Your partner has switched to Labour mode. Head to the app."
     }
   },
-  "flags": {}
+  "flags": {},
+  "contacts": {
+    "title": "Labour Contacts",
+    "noContacts": "No contacts yet. Add your midwife, doula, or partner.",
+    "addBtn": "+ Add contact",
+    "nicknamePlaceholder": "Name (e.g. Midwife Anna)",
+    "phonePlaceholder": "Phone number",
+    "save": "Save",
+    "cancel": "Cancel",
+    "importBtn": "Import from phone contacts"
+  }
 }

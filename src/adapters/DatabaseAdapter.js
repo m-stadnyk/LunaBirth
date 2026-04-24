@@ -126,4 +126,19 @@ export class DatabaseAdapter {
    * @returns {Promise<object|null>}
    */
   async getSettings() { throw new Error("Not implemented"); }
+
+  // ─── Labour Contacts ───────────────────────────────────────────────────────
+
+  /**
+   * Persist the full contacts array (replaces existing).
+   * @param {Array<{ id: string, nickname: string, phone: string }>} contacts
+   * @returns {Promise<void>}
+   */
+  async saveContacts(contacts) { throw new Error("Not implemented"); } // eslint-disable-line no-unused-vars
+
+  /**
+   * Load the stored contacts array.
+   * @returns {Promise<Array<{ id: string, nickname: string, phone: string }>>}
+   */
+  async getContacts() { throw new Error("Not implemented"); }
 }

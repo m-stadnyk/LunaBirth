@@ -1,7 +1,8 @@
 import { N, FONTS } from "../theme/index.js";
+import { Icon } from "./Icon.jsx";
 import { ModeToggle } from "./ModeToggle.jsx";
 
-export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }) {
+export function Header({ affirmation, fade, mode, onToggleMode, onOpenContacts, onOpenSettings }) {
   return (
     <div
       style={{
@@ -49,21 +50,22 @@ export function Header({ affirmation, fade, mode, onToggleMode, onOpenSettings }
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
         <ModeToggle mode={mode} onToggle={onToggleMode} />
-        <button
-          aria-label="Settings"
-          onClick={onOpenSettings}
-          style={{
-            background: "none",
-            border: "none",
-            color: N.muted,
-            fontSize: 18,
-            cursor: "pointer",
-            padding: "2px 4px",
-            lineHeight: 1,
-          }}
-        >
-          ⚙
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            aria-label="Labour contacts"
+            onClick={onOpenContacts}
+            style={{ background: "none", border: "none", color: N.muted, cursor: "pointer", padding: "2px 4px", lineHeight: 1 }}
+          >
+            <Icon name="phone" size={18} color={N.muted} />
+          </button>
+          <button
+            aria-label="Settings"
+            onClick={onOpenSettings}
+            style={{ background: "none", border: "none", color: N.muted, fontSize: 18, cursor: "pointer", padding: "2px 4px", lineHeight: 1 }}
+          >
+            ⚙
+          </button>
+        </div>
       </div>
     </div>
   );
