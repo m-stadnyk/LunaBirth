@@ -1,0 +1,63 @@
+name: Bump version on PR to main
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    # Skip if the last commit was the bot's own version bump
+    if: "!contains(github.event.head_commit.message, 'chore: bump version')"
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check if version already differs from main
+        id: version_check
+        run: |
+          git fetch origin main
+          MAIN_VERSION=$(git show origin/main:package.json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.parse(d).version))")
+          PR_VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
+          echo "main_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+          echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
+          if [ "$MAIN_VERSION" = "$PR_VERSION" ]; then
+            echo "should_bump=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_bump=false" >> $GITHUB_OUTPUT
+            echo "Version already bumped in this branch ($PR_VERSION vs main $MAIN_VERSION), skipping."
+          fi
+
+      - name: Bump patch version
+        id: bump
+        if: steps.version_check.outputs.should_bump == 'true'
+        run: |
+          OLD=${{ steps.version_check.outputs.pr_version }}
+          npm version patch --no-git-tag-version
+          NEW=$(node -e "process.stdout.write(require('./package.json').version)")
+          echo "old=$OLD" >> $GITHUB_OUTPUT
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Commit and push version bump
+        if: steps.version_check.outputs.should_bump == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "chore: bump version ${{ steps.bump.outputs.old }} → ${{ steps.bump.outputs.new }}"
+          git push origin HEAD:${{ github.head_ref }}
