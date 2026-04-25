@@ -344,10 +344,10 @@ describe("useTodos", () => {
       expect(adapter.saveTodos).toHaveBeenCalledWith([]);
     });
 
-    it("reverts to previous todos when saveTodos rejects on clearTodos", async () => {
+    it("keeps todos cleared when saveTodos rejects (optimistic update is permanent)", async () => {
       adapter.saveTodos
         .mockResolvedValueOnce(undefined) // addTodo succeeds
-        .mockRejectedValueOnce(new Error("RLS error")); // clearTodos fails
+        .mockRejectedValueOnce(new Error("RLS error")); // clearTodos save fails
 
       const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
       await act(async () => {});
@@ -355,7 +355,7 @@ describe("useTodos", () => {
 
       await act(async () => { result.current.clearTodos(); });
 
-      expect(result.current.todos).toHaveLength(1);
+      expect(result.current.todos).toHaveLength(0);
     });
   });
 
@@ -375,10 +375,10 @@ describe("useTodos", () => {
       expect(result.current.todos).toHaveLength(0);
     });
 
-    it("reverts deletion when saveTodos rejects (sync mode failure)", async () => {
+    it("keeps todo removed when saveTodos rejects (optimistic update is permanent)", async () => {
       adapter.saveTodos
         .mockResolvedValueOnce(undefined) // addTodo succeeds
-        .mockRejectedValueOnce(new Error("RLS policy violation")); // removeTodo fails
+        .mockRejectedValueOnce(new Error("RLS policy violation")); // removeTodo save fails
 
       const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
       await act(async () => {});
@@ -391,16 +391,15 @@ describe("useTodos", () => {
         result.current.removeTodo(id);
       });
 
-      expect(result.current.todos).toHaveLength(1);
-      expect(result.current.todos[0].id).toBe(id);
+      expect(result.current.todos).toHaveLength(0);
     });
   });
 
   describe("setTodos error handling", () => {
-    it("reverts state when saveTodos rejects on toggleDone", async () => {
+    it("keeps optimistic update when saveTodos rejects on toggleDone", async () => {
       adapter.saveTodos
         .mockResolvedValueOnce(undefined) // addTodo succeeds
-        .mockRejectedValueOnce(new Error("network error")); // toggleDone fails
+        .mockRejectedValueOnce(new Error("network error")); // toggleDone save fails
 
       const { result } = renderHook(() => useTodos(), { wrapper: makeWrapper(adapter) });
       await act(async () => {});
@@ -413,7 +412,7 @@ describe("useTodos", () => {
         result.current.toggleDone(id);
       });
 
-      expect(result.current.todos.find((t) => t.id === id).done).toBe(false);
+      expect(result.current.todos.find((t) => t.id === id).done).toBe(true);
     });
   });
 });
