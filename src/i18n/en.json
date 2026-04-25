@@ -124,27 +124,41 @@
     "cloudSyncLabel": "Cloud Sync",
     "cloudSyncStart": "Sync & share session",
     "cloudSyncInviteCode": "Invite code: {{code}}",
+    "cloudSyncPartnerCode": "Partner code",
     "cloudSyncJoinLabel": "Join as partner",
     "cloudSyncJoinPlaceholder": "Enter 6-digit code",
     "cloudSyncJoin": "Join",
-    "cloudSyncSignOut": "Sign out of sync",
+    "cloudSyncUnsync": "Unsync & go offline",
+    "cloudSyncUnsyncHint": "Downloads your data locally and deletes the cloud session.",
     "cloudSyncLastSynced": "Last synced: {{time}}",
     "cloudSyncSyncing": "Syncing…",
     "cloudSyncError": "Sync failed. Try again.",
     "cloudSyncSignedIn": "Synced to cloud",
     "cloudSyncPrivacyNote": "No account needed. Your data is stored anonymously.",
-    "cloudSyncSyncNow": "Sync now",
     "cloudSyncRolePartner": "Connected as partner",
     "dataLabel": "Data",
-    "clearTodosBtn": "Clear all tasks",
-    "clearTodosConfirmText": "This will permanently delete all tasks. Are you sure?",
-    "clearTodosYes": "Yes, clear all",
-    "clearTodosCancel": "Cancel",
+    "resetDataBtn": "Reset app data…",
     "appVersionLabel": "App Version",
     "checkForUpdates": "Check for Updates",
     "updateChecking": "Checking…",
     "updateUpToDate": "You're up to date",
     "updateAvailable": "Update found — reloading…"
+  },
+  "reset": {
+    "title": "Reset Data",
+    "subtitle": "Select what you want to clear. This cannot be undone.",
+    "selectAll": "Select all",
+    "contractions": "Contraction history",
+    "hydration": "Hydration data",
+    "todos": "Tasks / to-do list",
+    "contacts": "Labour contacts",
+    "relief": "Pain relief methods",
+    "appSettings": "App settings (mode, due date)",
+    "clearBtn": "Clear {{n}} selected",
+    "confirmText": "This will permanently delete the selected data. Are you sure?",
+    "confirmYes": "Yes, delete",
+    "clearing": "Clearing…",
+    "cancel": "Cancel"
   },
   "notifications": {
     "waterTitle": "Time to drink! 💧",
@@ -154,7 +168,9 @@
       "body": "Your partner has switched to Labour mode. Head to the app."
     }
   },
-  "flags": {},
+  "flags": {
+    "debugPopup": "Debug error popup"
+  },
   "contacts": {
     "title": "Labour Contacts",
     "noContacts": "No contacts yet. Add your midwife, doula, or partner.",

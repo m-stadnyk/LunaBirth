@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDatabase } from "../context/DatabaseContext.jsx";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { sortTodos } from "../utils/todoSorter.js";
 
 /**
@@ -8,7 +8,7 @@ import { sortTodos } from "../utils/todoSorter.js";
  * when the adapter is swapped to SupabaseAdapter.
  */
 export function useTodos() {
-  const adapter = useDatabase();
+  const { adapter, resetKey } = useDatabaseContext();
   const [todos, setTodosRaw] = useState([]);
 
   // Load todos and subscribe to real-time updates.
@@ -25,7 +25,7 @@ export function useTodos() {
       cancelled = true;
       unsub();
     };
-  }, [adapter]);
+  }, [adapter, resetKey]);
 
   const setTodos = (next) => {
     const sorted = sortTodos(next);

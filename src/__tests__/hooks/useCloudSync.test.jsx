@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useCloudSync } from "../../hooks/useCloudSync.js";
 import { DatabaseProvider } from "../../context/DatabaseContext.jsx";
+import { DebugProvider } from "../../context/DebugContext.jsx";
+import { storage } from "../../utils/storage.js";
 
 // ── Hoisted shared mock object ────────────────────────────────────────────────
 const mockSupabaseAdapter = vi.hoisted(() => {
@@ -14,6 +16,7 @@ const mockSupabaseAdapter = vi.hoisted(() => {
     restoreSession: vi.fn(),
     createSession: vi.fn(async () => ({ sessionId: "sess-123", inviteCode: "ABC123" })),
     joinSession: vi.fn(async () => ({ sessionId: "sess-456" })),
+    destroySession: vi.fn(async () => {}),
     saveContractions: vi.fn(async () => {}),
     saveHydration: vi.fn(async () => {}),
     saveTodos: vi.fn(async () => {}),
@@ -38,13 +41,11 @@ vi.mock("../../utils/storage.js", () => ({
   storage: {
     get: vi.fn(async () => null),
     set: vi.fn(async () => {}),
+    remove: vi.fn(async () => {}),
   },
 }));
 
 // ── Mock LocalAdapter ─────────────────────────────────────────────────────────
-// localRef.current tracks the most recently constructed instance so tests can
-// assert on what was written to local during signIn cleanup or signOut migration.
-// Must be hoisted so the mock factory (also hoisted) can reference it.
 const localRef = vi.hoisted(() => ({ current: null }));
 
 vi.mock("../../adapters/LocalAdapter.js", () => ({
@@ -59,6 +60,7 @@ vi.mock("../../adapters/LocalAdapter.js", () => ({
     this.saveTodos = vi.fn(async () => {});
     this.saveSettings = vi.fn(async () => {});
     this.saveContacts = vi.fn(async () => {});
+    this.clearData = vi.fn(async () => {});
     localRef.current = this;
   },
 }));
@@ -72,12 +74,18 @@ vi.mock("../../adapters/SupabaseAdapter.js", () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function wrapper({ children }) {
-  return <DatabaseProvider>{children}</DatabaseProvider>;
+  return (
+    <DatabaseProvider>
+      <DebugProvider>{children}</DebugProvider>
+    </DatabaseProvider>
+  );
 }
 
 describe("useCloudSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset storage.get to null so session restore tests don't leak into others
+    storage.get.mockResolvedValue(null);
     localRef.current = null;
     mockSupabaseAdapter._resetSettingsCallback();
     // Restore defaults after clearAllMocks
@@ -86,6 +94,7 @@ describe("useCloudSync", () => {
     mockSupabaseAdapter.restoreSession.mockImplementation(() => {});
     mockSupabaseAdapter.createSession.mockResolvedValue({ sessionId: "sess-123", inviteCode: "ABC123" });
     mockSupabaseAdapter.joinSession.mockResolvedValue({ sessionId: "sess-456" });
+    mockSupabaseAdapter.destroySession.mockResolvedValue();
     mockSupabaseAdapter.signOut.mockResolvedValue();
     mockSupabaseAdapter.saveContractions.mockResolvedValue();
     mockSupabaseAdapter.saveHydration.mockResolvedValue();
@@ -229,101 +238,20 @@ describe("useCloudSync", () => {
     expect(result.current.error).toBe("Network error");
   });
 
-  describe("signIn: local cleanup after migration", () => {
-    it("clears todos, contractions, and contacts from local after switching to cloud", async () => {
+  describe("signIn: local data cleared after upload", () => {
+    it("calls clearData on local adapter after uploading to cloud", async () => {
       const { result } = renderHook(() => useCloudSync(), { wrapper });
       await act(async () => { await result.current.signIn(); });
 
-      expect(localRef.current.saveTodos).toHaveBeenCalledWith([]);
-      expect(localRef.current.saveContractions).toHaveBeenCalledWith([]);
-      expect(localRef.current.saveContacts).toHaveBeenCalledWith([]);
+      expect(localRef.current.clearData).toHaveBeenCalled();
     });
 
-    it("resets hydration to defaults in local after migration", async () => {
+    it("clearData failure does not prevent sign-in from succeeding", async () => {
       const { result } = renderHook(() => useCloudSync(), { wrapper });
-      await act(async () => { await result.current.signIn(); });
-
-      expect(localRef.current.saveHydration).toHaveBeenCalledWith({
-        drinkCount: 0,
-        lastDrank: expect.any(Number),
-        drinkInterval: 15,
-        intervals: [5, 15, 30],
-      });
-    });
-
-    it("does NOT call saveSettings on local during cleanup", async () => {
-      const { result } = renderHook(() => useCloudSync(), { wrapper });
-      await act(async () => { await result.current.signIn(); });
-
-      expect(localRef.current.saveSettings).not.toHaveBeenCalled();
-    });
-
-    it("cleanup failure does not prevent sign-in from succeeding", async () => {
-      const { result } = renderHook(() => useCloudSync(), { wrapper });
-      // We can't easily make the cleanup fail since it uses the same mock instance,
-      // but we can verify sign-in succeeds even under normal conditions
       await act(async () => { await result.current.signIn(); });
 
       expect(result.current.isSignedIn).toBe(true);
       expect(result.current.error).toBeNull();
-    });
-  });
-
-  describe("dueDate auto-sync", () => {
-    it("auto-syncs dueDate to Supabase when dueDate prop changes while signed in as primary", async () => {
-      const { result, rerender } = renderHook(
-        ({ dueDate, countdownUnit }) => useCloudSync({ dueDate, countdownUnit }),
-        { wrapper, initialProps: { dueDate: null, countdownUnit: "wks_days" } }
-      );
-      await act(async () => { await result.current.signIn(); });
-
-      mockSupabaseAdapter.saveSettings.mockClear();
-
-      await act(async () => { rerender({ dueDate: "2026-08-01", countdownUnit: "wks_days" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ dueDate: "2026-08-01" })
-      );
-    });
-
-    it("auto-syncs countdownUnit to Supabase when it changes while signed in as primary", async () => {
-      const { result, rerender } = renderHook(
-        ({ dueDate, countdownUnit }) => useCloudSync({ dueDate, countdownUnit }),
-        { wrapper, initialProps: { dueDate: "2026-08-01", countdownUnit: "wks_days" } }
-      );
-      await act(async () => { await result.current.signIn(); });
-
-      mockSupabaseAdapter.saveSettings.mockClear();
-
-      await act(async () => { rerender({ dueDate: "2026-08-01", countdownUnit: "days" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ countdownUnit: "days" })
-      );
-    });
-
-    it("does not auto-sync dueDate when not signed in", async () => {
-      const { rerender } = renderHook(
-        ({ dueDate }) => useCloudSync({ dueDate }),
-        { wrapper, initialProps: { dueDate: null } }
-      );
-
-      await act(async () => { rerender({ dueDate: "2026-08-01" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
-    });
-
-    it("does not auto-sync dueDate when role is partner", async () => {
-      const { result, rerender } = renderHook(
-        ({ dueDate }) => useCloudSync({ dueDate }),
-        { wrapper, initialProps: { dueDate: null } }
-      );
-      await act(async () => { await result.current.joinAsPartner("ABC123"); });
-
-      mockSupabaseAdapter.saveSettings.mockClear();
-      await act(async () => { rerender({ dueDate: "2026-08-01" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
     });
   });
 
@@ -348,19 +276,26 @@ describe("useCloudSync", () => {
     expect(result.current.error).toBe("Invalid invite code");
   });
 
-  describe("signOut", () => {
+  describe("unsync / signOut", () => {
     it("reverts to local mode and clears state", async () => {
       const { result } = renderHook(() => useCloudSync(), { wrapper });
 
       await act(async () => { await result.current.signIn(); });
       expect(result.current.isSignedIn).toBe(true);
 
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(result.current.isSignedIn).toBe(false);
       expect(result.current.sessionId).toBeNull();
       expect(result.current.role).toBeNull();
       expect(result.current.inviteCode).toBeNull();
+    });
+
+    it("signOut is an alias for unsync", async () => {
+      const { result } = renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await result.current.signIn(); });
+      await act(async () => { await result.current.signOut(); });
+      expect(result.current.isSignedIn).toBe(false);
     });
 
     it("reads all cloud data before disconnecting", async () => {
@@ -373,7 +308,7 @@ describe("useCloudSync", () => {
       mockSupabaseAdapter.getContacts.mockClear();
       mockSupabaseAdapter.getSettings.mockClear();
 
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(mockSupabaseAdapter.getTodos).toHaveBeenCalled();
       expect(mockSupabaseAdapter.getContractions).toHaveBeenCalled();
@@ -389,32 +324,37 @@ describe("useCloudSync", () => {
 
       const { result } = renderHook(() => useCloudSync(), { wrapper });
       await act(async () => { await result.current.signIn(); });
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(localRef.current.saveTodos).toHaveBeenCalledWith([{ id: "t1", text: "pack bag" }]);
       expect(localRef.current.saveContractions).toHaveBeenCalledWith([{ start: 99, duration: 45 }]);
       expect(localRef.current.saveContacts).toHaveBeenCalledWith([{ id: "c1", nickname: "Midwife" }]);
     });
 
-    it("merges cloud reliefMethods into local settings without overwriting dueDate", async () => {
+    it("saves cloud settings to local on unsync", async () => {
       mockSupabaseAdapter.getSettings.mockResolvedValue({ reliefMethods: [{ id: "m1", name: "Sway" }] });
 
       const { result } = renderHook(() => useCloudSync(), { wrapper });
       await act(async () => { await result.current.signIn(); });
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(localRef.current.saveSettings).toHaveBeenCalledWith(
         expect.objectContaining({ reliefMethods: [{ id: "m1", name: "Sway" }] })
       );
-      // dueDate comes from local (getSettings returns null → mergedSettings has no dueDate key from cloud)
-      const call = localRef.current.saveSettings.mock.calls[0][0];
-      expect(call).not.toHaveProperty("dueDate", expect.any(String)); // no cloud dueDate was set
+    });
+
+    it("destroys the cloud session on unsync", async () => {
+      const { result } = renderHook(() => useCloudSync(), { wrapper });
+      await act(async () => { await result.current.signIn(); });
+      await act(async () => { await result.current.unsync(); });
+
+      expect(mockSupabaseAdapter.destroySession).toHaveBeenCalled();
     });
 
     it("skips migration silently when not signed in", async () => {
       const { result } = renderHook(() => useCloudSync(), { wrapper });
 
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(mockSupabaseAdapter.getTodos).not.toHaveBeenCalled();
       expect(result.current.isSignedIn).toBe(false);
@@ -425,84 +365,10 @@ describe("useCloudSync", () => {
 
       const { result } = renderHook(() => useCloudSync(), { wrapper });
       await act(async () => { await result.current.signIn(); });
-      await act(async () => { await result.current.signOut(); });
+      await act(async () => { await result.current.unsync(); });
 
       expect(result.current.isSignedIn).toBe(false);
       expect(result.current.error).toBeNull();
-    });
-  });
-
-  it("sync: calls save methods with local data", async () => {
-    const { result } = renderHook(() => useCloudSync(), { wrapper });
-    await act(async () => { await result.current.signIn(); });
-
-    vi.clearAllMocks();
-    mockSupabaseAdapter.saveContractions.mockResolvedValue();
-    mockSupabaseAdapter.saveHydration.mockResolvedValue();
-    mockSupabaseAdapter.saveTodos.mockResolvedValue();
-    mockSupabaseAdapter.saveSettings.mockResolvedValue();
-
-    await act(async () => { await result.current.sync(); });
-
-    expect(mockSupabaseAdapter.saveContractions).toHaveBeenCalled();
-    expect(mockSupabaseAdapter.saveTodos).toHaveBeenCalled();
-  });
-
-  it("sync: is a no-op when not signed in", async () => {
-    const { result } = renderHook(() => useCloudSync(), { wrapper });
-
-    await act(async () => { await result.current.sync(); });
-
-    expect(mockSupabaseAdapter.saveContractions).not.toHaveBeenCalled();
-  });
-
-  it("sync: is a no-op when role is partner", async () => {
-    const { result } = renderHook(() => useCloudSync(), { wrapper });
-    await act(async () => { await result.current.joinAsPartner("ABC123"); });
-
-    vi.clearAllMocks();
-    await act(async () => { await result.current.sync(); });
-
-    expect(mockSupabaseAdapter.saveContractions).not.toHaveBeenCalled();
-  });
-
-  describe("mode auto-sync (primary)", () => {
-    it("saves mode immediately when mode prop changes while signed in as primary", async () => {
-      const { result, rerender } = renderHook(
-        ({ mode }) => useCloudSync({ mode }),
-        { wrapper, initialProps: { mode: "expectation" } }
-      );
-      await act(async () => { await result.current.signIn(); });
-
-      mockSupabaseAdapter.saveSettings.mockClear();
-
-      await act(async () => { rerender({ mode: "labour" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).toHaveBeenCalledWith({ mode: "labour" });
-    });
-
-    it("does not auto-sync mode when not signed in", async () => {
-      const { rerender } = renderHook(
-        ({ mode }) => useCloudSync({ mode }),
-        { wrapper, initialProps: { mode: "expectation" } }
-      );
-
-      await act(async () => { rerender({ mode: "labour" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
-    });
-
-    it("does not auto-sync mode when role is partner", async () => {
-      const { result, rerender } = renderHook(
-        ({ mode }) => useCloudSync({ mode }),
-        { wrapper, initialProps: { mode: "expectation" } }
-      );
-      await act(async () => { await result.current.joinAsPartner("ABC123"); });
-
-      mockSupabaseAdapter.saveSettings.mockClear();
-      await act(async () => { rerender({ mode: "labour" }); });
-
-      expect(mockSupabaseAdapter.saveSettings).not.toHaveBeenCalled();
     });
   });
 

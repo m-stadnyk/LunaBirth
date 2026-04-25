@@ -23,10 +23,7 @@ const mockContext = {
       "settings.featuresLabel": "Features",
       "settings.noFlags": "No feature flags configured yet.",
       "settings.dataLabel": "Data",
-      "settings.clearTodosBtn": "Clear all tasks",
-      "settings.clearTodosConfirmText": "This will permanently delete all tasks. Are you sure?",
-      "settings.clearTodosYes": "Yes, clear all",
-      "settings.clearTodosCancel": "Cancel",
+      "settings.resetDataBtn": "Reset app data…",
     };
     return map[key] ?? key;
   },
@@ -107,10 +104,7 @@ describe("SettingsModal", () => {
         "settings.featuresLabel": "Features",
         "settings.noFlags": "No feature flags configured yet.",
         "settings.dataLabel": "Data",
-        "settings.clearTodosBtn": "Clear all tasks",
-        "settings.clearTodosConfirmText": "This will permanently delete all tasks. Are you sure?",
-        "settings.clearTodosYes": "Yes, clear all",
-        "settings.clearTodosCancel": "Cancel",
+        "settings.resetDataBtn": "Reset app data…",
         "flags.alpha": "Alpha Feature",
         "flags.beta": "Beta Feature",
       };
@@ -128,40 +122,21 @@ describe("SettingsModal", () => {
   });
 
   describe("Data section", () => {
-    it("does not render Data section when onClearTodos is not provided", () => {
+    it("does not render Data section when onOpenResetModal is not provided", () => {
       render(<SettingsModal open={true} onClose={() => {}} />);
-      expect(screen.queryByText("Clear all tasks")).toBeNull();
+      expect(screen.queryByText("Reset app data…")).toBeNull();
     });
 
-    it("shows the clear button when onClearTodos is provided", () => {
-      render(<SettingsModal open={true} onClose={() => {}} onClearTodos={vi.fn()} />);
-      expect(screen.getByText("Clear all tasks")).toBeInTheDocument();
+    it("shows the reset button when onOpenResetModal is provided", () => {
+      render(<SettingsModal open={true} onClose={() => {}} onOpenResetModal={vi.fn()} />);
+      expect(screen.getByText("Reset app data…")).toBeInTheDocument();
     });
 
-    it("shows confirmation UI when clear button is clicked", async () => {
-      render(<SettingsModal open={true} onClose={() => {}} onClearTodos={vi.fn()} />);
-      await userEvent.click(screen.getByText("Clear all tasks"));
-      expect(screen.getByText("This will permanently delete all tasks. Are you sure?")).toBeInTheDocument();
-      expect(screen.getByText("Yes, clear all")).toBeInTheDocument();
-      expect(screen.getByText("Cancel")).toBeInTheDocument();
-    });
-
-    it("calls onClearTodos and hides confirmation when confirmed", async () => {
-      const onClearTodos = vi.fn();
-      render(<SettingsModal open={true} onClose={() => {}} onClearTodos={onClearTodos} />);
-      await userEvent.click(screen.getByText("Clear all tasks"));
-      await userEvent.click(screen.getByText("Yes, clear all"));
-      expect(onClearTodos).toHaveBeenCalledOnce();
-      expect(screen.queryByText("Yes, clear all")).toBeNull();
-    });
-
-    it("hides confirmation and does not call onClearTodos when cancelled", async () => {
-      const onClearTodos = vi.fn();
-      render(<SettingsModal open={true} onClose={() => {}} onClearTodos={onClearTodos} />);
-      await userEvent.click(screen.getByText("Clear all tasks"));
-      await userEvent.click(screen.getByText("Cancel"));
-      expect(onClearTodos).not.toHaveBeenCalled();
-      expect(screen.queryByText("Yes, clear all")).toBeNull();
+    it("calls onOpenResetModal when the reset button is clicked", async () => {
+      const onOpenResetModal = vi.fn();
+      render(<SettingsModal open={true} onClose={() => {}} onOpenResetModal={onOpenResetModal} />);
+      await userEvent.click(screen.getByText("Reset app data…"));
+      expect(onOpenResetModal).toHaveBeenCalledOnce();
     });
   });
 

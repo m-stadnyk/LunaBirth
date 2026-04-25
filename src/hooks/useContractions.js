@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useDatabase } from "../context/DatabaseContext.jsx";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { computePhase, computeStats } from "../utils/phaseAnalysis.js";
 import { PHASES } from "../constants/index.js";
 
@@ -9,7 +9,7 @@ import { PHASES } from "../constants/index.js";
  * @param {function} onPhaseChange - Called with (newPhase, suggestedDrinkMin) when phase changes.
  */
 export function useContractions({ onPhaseChange } = {}) {
-  const adapter = useDatabase();
+  const { adapter, resetKey } = useDatabaseContext();
   const [contractions, setContractions] = useState([]);
   const [activeStart, setActiveStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
@@ -32,7 +32,7 @@ export function useContractions({ onPhaseChange } = {}) {
       cancelled = true;
       unsub();
     };
-  }, [adapter]);
+  }, [adapter, resetKey]);
 
   // Live elapsed timer while a contraction is active
   useEffect(() => {

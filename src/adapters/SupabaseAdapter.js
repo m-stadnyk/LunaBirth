@@ -76,7 +76,6 @@ export class SupabaseAdapter extends DatabaseAdapter {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) throw new Error("Must be signed in to create a session");
 
-    // Generate a 6-character alphanumeric invite code
     const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
 
     const { data, error } = await sb
@@ -111,13 +110,28 @@ export class SupabaseAdapter extends DatabaseAdapter {
     return this.#sessionId;
   }
 
+  async destroySession() {
+    const sb = await this.#getClient();
+    if (!this.#sessionId) return;
+
+    await Promise.all([
+      sb.from("contraction_snapshots").delete().eq("session_id", this.#sessionId),
+      sb.from("hydration_snapshots").delete().eq("session_id", this.#sessionId),
+      sb.from("todo_snapshots").delete().eq("session_id", this.#sessionId),
+      sb.from("contact_snapshots").delete().eq("session_id", this.#sessionId),
+      sb.from("sessions").delete().eq("id", this.#sessionId),
+    ]);
+
+    this.#sessionId = null;
+    this.#role = null;
+  }
+
   // ─── Contractions ──────────────────────────────────────────────────────────
 
   async saveContractions(contractions) {
     const sb = await this.#getClient();
     if (!this.#sessionId) throw new Error("No active session");
 
-    // Upsert a single snapshot row for simplicity (full array replace)
     const { error } = await sb
       .from("contraction_snapshots")
       .upsert({ session_id: this.#sessionId, data: contractions }, { onConflict: "session_id" });
@@ -144,21 +158,14 @@ export class SupabaseAdapter extends DatabaseAdapter {
       if (!this.#sessionId) return;
       channel = sb
         .channel(`contractions:${this.#sessionId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "contraction_snapshots",
-            filter: `session_id=eq.${this.#sessionId}`,
-          },
-          (payload) => {
-            callback(payload.new?.data ?? []);
-          }
-        )
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "contraction_snapshots",
+          filter: `session_id=eq.${this.#sessionId}`,
+        }, (payload) => { callback(payload.new?.data ?? []); })
         .subscribe();
     });
-
     return () => { channel?.unsubscribe(); };
   }
 
@@ -220,21 +227,14 @@ export class SupabaseAdapter extends DatabaseAdapter {
       if (!this.#sessionId) return;
       channel = sb
         .channel(`todos:${this.#sessionId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "todo_snapshots",
-            filter: `session_id=eq.${this.#sessionId}`,
-          },
-          (payload) => {
-            callback(payload.new?.data ?? []);
-          }
-        )
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "todo_snapshots",
+          filter: `session_id=eq.${this.#sessionId}`,
+        }, (payload) => { callback(payload.new?.data ?? []); })
         .subscribe();
     });
-
     return () => { channel?.unsubscribe(); };
   }
 
@@ -266,13 +266,24 @@ export class SupabaseAdapter extends DatabaseAdapter {
 
   // ─── Settings ──────────────────────────────────────────────────────────────
 
-  async saveSettings(settings) {
+  /**
+   * Merges partialSettings with the existing settings blob in the sessions row.
+   * This preserves keys written by other hooks (e.g. reliefMethods vs locale).
+   */
+  async saveSettings(partialSettings) {
     const sb = await this.#getClient();
     if (!this.#sessionId) throw new Error("No active session");
 
+    const { data } = await sb
+      .from("sessions")
+      .select("settings")
+      .eq("id", this.#sessionId)
+      .maybeSingle();
+
+    const merged = { ...(data?.settings ?? {}), ...partialSettings };
     const { error } = await sb
       .from("sessions")
-      .update({ settings })
+      .update({ settings: merged })
       .eq("id", this.#sessionId);
     if (error) throw error;
   }
@@ -297,21 +308,62 @@ export class SupabaseAdapter extends DatabaseAdapter {
       if (!this.#sessionId) return;
       channel = sb
         .channel(`settings:${this.#sessionId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "sessions",
-            filter: `id=eq.${this.#sessionId}`,
-          },
-          (payload) => {
-            callback(payload.new?.settings ?? {});
-          }
-        )
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "sessions",
+          filter: `id=eq.${this.#sessionId}`,
+        }, (payload) => { callback(payload.new?.settings ?? {}); })
         .subscribe();
     });
-
     return () => { channel?.unsubscribe(); };
+  }
+
+  // ─── Clear Data ───────────────────────────────────────────────────────────
+
+  async clearData(categories) {
+    const sb = await this.#getClient();
+    if (!this.#sessionId) return;
+
+    const has = (cat) => categories.includes("all") || categories.includes(cat);
+    const ops = [];
+
+    if (has("contractions")) {
+      ops.push(sb.from("contraction_snapshots").delete().eq("session_id", this.#sessionId));
+    }
+    if (has("hydration")) {
+      ops.push(sb.from("hydration_snapshots").delete().eq("session_id", this.#sessionId));
+    }
+    if (has("todos")) {
+      ops.push(sb.from("todo_snapshots").delete().eq("session_id", this.#sessionId));
+    }
+    if (has("contacts")) {
+      ops.push(sb.from("contact_snapshots").delete().eq("session_id", this.#sessionId));
+    }
+
+    // Settings fields are cleared by removing specific keys from the JSON blob
+    if (has("relief") || has("appSettings")) {
+      ops.push(
+        (async () => {
+          const { data } = await sb
+            .from("sessions")
+            .select("settings")
+            .eq("id", this.#sessionId)
+            .maybeSingle();
+
+          const current = { ...(data?.settings ?? {}) };
+          if (has("relief")) delete current.reliefMethods;
+          if (has("appSettings")) {
+            delete current.mode;
+            delete current.dueDate;
+            delete current.countdownUnit;
+          }
+
+          await sb.from("sessions").update({ settings: current }).eq("id", this.#sessionId);
+        })()
+      );
+    }
+
+    await Promise.all(ops);
   }
 }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useDatabase } from "../context/DatabaseContext.jsx";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 
 export function useLabourContacts() {
-  const adapter = useDatabase();
+  const { adapter, resetKey } = useDatabaseContext();
   const [contacts, setContacts] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNickname, setNewNickname] = useState("");
@@ -14,7 +14,7 @@ export function useLabourContacts() {
       if (!cancelled) setContacts(data ?? []);
     });
     return () => { cancelled = true; };
-  }, [adapter]);
+  }, [adapter, resetKey]);
 
   const addContact = async () => {
     if (!newNickname.trim() || !newPhone.trim()) return;

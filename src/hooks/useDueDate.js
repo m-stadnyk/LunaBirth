@@ -1,38 +1,36 @@
 import { useState, useEffect, useMemo } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { computeCountdown } from "../utils/countdown.js";
 
-const KEY_DATE = "luna_due_date";
-const KEY_UNIT = "luna_countdown_unit";
+const VALID_UNITS = ["wks_days", "days", "hours"];
 
 export function useDueDate() {
+  const { adapter, resetKey } = useDatabaseContext();
   const [dueDate, setDueDateState] = useState(null);
   const [countdownUnit, setCountdownUnitState] = useState("wks_days");
 
   useEffect(() => {
-    Promise.all([storage.get(KEY_DATE), storage.get(KEY_UNIT)]).then(
-      ([storedDate, storedUnit]) => {
-        if (storedDate?.value) setDueDateState(storedDate.value);
-        if (["wks_days", "days", "hours"].includes(storedUnit?.value)) {
-          setCountdownUnitState(storedUnit.value);
-        }
-      }
-    );
-  }, []);
+    adapter.getSettings().then((settings) => {
+      setDueDateState(settings?.dueDate || null);
+      setCountdownUnitState(
+        VALID_UNITS.includes(settings?.countdownUnit) ? settings.countdownUnit : "wks_days"
+      );
+    });
+  }, [adapter, resetKey]);
 
   const setDueDate = (iso) => {
     setDueDateState(iso);
-    storage.set(KEY_DATE, iso);
+    adapter.saveSettings({ dueDate: iso || null }).catch(() => {});
   };
 
   const clearDueDate = () => {
     setDueDateState(null);
-    storage.set(KEY_DATE, "");
+    adapter.saveSettings({ dueDate: null }).catch(() => {});
   };
 
   const setCountdownUnit = (unit) => {
     setCountdownUnitState(unit);
-    storage.set(KEY_UNIT, unit);
+    adapter.saveSettings({ countdownUnit: unit }).catch(() => {});
   };
 
   const countdown = useMemo(

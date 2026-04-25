@@ -13,6 +13,5 @@
  *   4. Gate the feature:       {flags.myFlag && <MyFeature />}
  */
 export const FEATURE_FLAGS = [
-  // Example:
-  // { id: "contractions", labelKey: "flags.contractions", defaultValue: true },
+  { id: "debugPopup", labelKey: "flags.debugPopup", defaultValue: false },
 ];

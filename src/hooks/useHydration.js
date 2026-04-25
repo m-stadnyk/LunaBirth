@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useDatabase } from "../context/DatabaseContext.jsx";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { PHASES } from "../constants/index.js";
 
 /**
@@ -10,7 +10,7 @@ import { PHASES } from "../constants/index.js";
  * @param {function} [opts.onDrinkAlert] - Called once when the countdown transitions to 0 (false→true).
  */
 export function useHydration({ onDrinkAlert } = {}) {
-  const adapter = useDatabase();
+  const { adapter, resetKey } = useDatabaseContext();
   const [drinkInterval, setDrinkInterval] = useState(15);
   const drinkIntervalRef = useRef(15);
   const [intervals, setIntervals] = useState([5, 15, 30]);
@@ -51,7 +51,7 @@ export function useHydration({ onDrinkAlert } = {}) {
       }
     });
     return () => { cancelled = true; };
-  }, [adapter]);
+  }, [adapter, resetKey]);
 
   // Keep callback ref current so the interval closure always calls the latest version
   useEffect(() => { onDrinkAlertRef.current = onDrinkAlert; }, [onDrinkAlert]);

@@ -39,7 +39,8 @@ src/
 │   └── index.js            # Re-exports AFFIRMATIONS, PHASES, DEFAULT_METHODS
 ├── context/
 │   ├── LocaleContext.jsx   # i18n provider (en/uk) — wrap with useLocale() hook
-│   ├── DatabaseContext.jsx # Provides active storage adapter to the component tree
+│   ├── DatabaseContext.jsx # Provides active storage adapter + clearData/resetKey to the component tree
+│   ├── DebugContext.jsx    # Global error queue for the debug popup feature
 │   └── FeatureFlagContext.jsx # Provides feature flag values and toggles
 ├── theme/
 │   └── index.js            # Two palettes: N (night-sky/dark) and P (legacy warm)
@@ -49,15 +50,15 @@ src/
 │   ├── i18n.js             # getNestedValue, createTranslator
 │   ├── media.js            # getMediaType(url), getYtId(url)
 │   ├── phaseAnalysis.js    # computePhase, computeStats, sortByPhase
-│   ├── storage.js          # Async localStorage wrapper (get/set)
+│   ├── storage.js          # Async localStorage wrapper (get/set/remove)
 │   └── todoSorter.js       # sortTodos, groupByArea (keyword-based categorization)
 ├── hooks/                  # Stateful logic
 │   ├── useAffirmations.js  # Locale-aware affirmation rotation (9s interval)
-│   ├── useAppMode.js       # Labour ↔ expectation mode toggle
-│   ├── useCloudSync.js     # Supabase auth, session sharing, partner invite flow
+│   ├── useAppMode.js       # Labour ↔ expectation mode toggle (persists via adapter settings)
+│   ├── useCloudSync.js     # Supabase auth, session sharing, partner invite, unsync
 │   ├── useContractions.js  # Contraction timer, phase detection, stats
-│   ├── useDueDate.js       # Due date + countdown unit management
-│   ├── useFeatureFlags.js  # Feature flag state with localStorage persistence
+│   ├── useDueDate.js       # Due date + countdown unit management (persists via adapter settings)
+│   ├── useFeatureFlags.js  # Feature flag state (persists via adapter settings)
 │   ├── useHydration.js     # Water reminder timer, drink logging, intervals
 │   ├── useLocale.js        # Language switching (en/uk)
 │   ├── useNotifications.js # Browser Notification API for water reminders
@@ -69,7 +70,9 @@ src/
 │   ├── Header.jsx          # Title, affirmation, mode toggle, settings button
 │   ├── TabBar.jsx          # Tab navigation (different tabs per mode)
 │   ├── ModeToggle.jsx      # Labour (✦) ↔ Expecting (☽) switcher
-│   ├── SettingsModal.jsx   # Language, notifications, cloud sync, feature flags
+│   ├── SettingsModal.jsx   # Language, notifications, cloud sync, feature flags, data reset button
+│   ├── ResetModal.jsx      # Bottom-sheet modal: checkbox selection of data categories to clear
+│   ├── DebugPopup.jsx      # Fixed-position error cards (visible only when debugPopup flag is on)
 │   ├── LabourContactsModal.jsx # Contacts popup: add/remove/call (tel: links), Contact Picker API on Android
 │   ├── MethodModal.jsx     # Full-screen relief method viewer with media
 │   ├── MediaDisplay.jsx    # YouTube / Spotify / image / link embeds
@@ -121,24 +124,40 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - All state lives in custom hooks in `src/hooks/`.
 - No Redux, no Zustand — plain `useState`/`useEffect`/`useRef`/`useMemo`.
 - Persistent state is loaded on mount and saved on change via the active `DatabaseAdapter` from `DatabaseContext`.
-- Feature hooks (`useContractions`, `useTodos`, `useHydration`, `useRelief`) call `adapter.getX()` / `adapter.saveX()` / `adapter.subscribeX()` from `useDatabase()` — never `storage.get/set` directly.
+- All hooks consume the adapter via `useDatabaseContext()` — never `storage.get/set` directly.
+- Feature hooks (`useContractions`, `useTodos`, `useHydration`, `useRelief`, `useLocale`, `useFeatureFlags`, `useAppMode`, `useDueDate`) all call `adapter.getX()` / `adapter.saveX()`. Settings-type hooks (locale, flags, mode, dueDate) call `adapter.getSettings()` / `adapter.saveSettings({ field })`.
 - When adapter changes (e.g. partner joins and context swaps to `SupabaseAdapter`), hooks re-hydrate automatically because `adapter` is in their `useEffect` dependency array.
+- `DatabaseContext` also exposes `resetKey` (an integer) and `clearData(categories)`. `resetKey` increments after every `clearData()` call — hooks include it in their effect deps so they automatically reload after a data reset.
+- Provider order matters: `DatabaseProvider` wraps everything. `LocaleProvider`, `FeatureFlagProvider`, and `DebugProvider` are nested inside so they can access the adapter and error queue.
 
 ### Storage Adapters
 - `src/adapters/` contains a pluggable storage layer: `DatabaseAdapter` (abstract base), `LocalAdapter` (localStorage), `SupabaseAdapter` (cloud).
-- The active adapter is provided via `DatabaseContext` and consumed by feature hooks via `useDatabase()`.
+- The active adapter is provided via `DatabaseContext` and consumed by all hooks via `useDatabaseContext()`.
 - The app defaults to `LocalAdapter` — Supabase is only activated when the user opts into cloud sync.
 - Swapping adapters (via `setAdapter` from `DatabaseContext`) causes all feature hooks to re-load their state from the new backend and start new realtime subscriptions.
+- Both adapters implement `clearData(categories)` — accepts an array of category strings (`"contractions"`, `"hydration"`, `"todos"`, `"contacts"`, `"relief"`, `"appSettings"`, or `"all"`). Increments `resetKey` via `DatabaseContext.clearData()`.
+- Both adapters implement `destroySession()` — `LocalAdapter` delegates to `clearData(["all"])`; `SupabaseAdapter` deletes all snapshot rows and the session row, then nulls internal session state.
+- `SupabaseAdapter.saveSettings()` uses read-merge-write semantics — it reads the current cloud settings blob, merges the partial update, then writes back. This prevents multiple hooks writing different fields from overwriting each other.
 - Tests for adapters live in `src/__tests__/adapters/`.
 
 ### Feature Flags
 - Feature flag definitions (labels, defaults) live in `src/constants/featureFlags.js`.
 - Runtime values are managed by `useFeatureFlags` and provided via `FeatureFlagContext`.
-- Flags are persisted to `luna_flags` in localStorage.
+- Flags are persisted via `adapter.saveSettings({ flags: {...} })` — they live inside the settings blob (not a separate `luna_flags` key anymore).
 - The Settings modal surfaces a toggleable list of flags.
 
+### Debug Popup
+- `DebugContext` (in `src/context/DebugContext.jsx`) maintains a global error queue.
+- Any hook or adapter calls `pushError(message)` from `useDebug()` to add an error.
+- `DebugPopup` (`src/components/DebugPopup.jsx`) renders fixed-position dismissable cards, but only when the `debugPopup` feature flag is enabled.
+- Use this for non-fatal errors that should be surfaced to developers/testers without crashing the UI (e.g. cloud sync failures, unsync errors).
+
 ### Cloud Sync (Supabase)
-- Managed by `useCloudSync` — handles sign-in, session creation, partner invite flow, sync, and sign-out.
+- Managed by `useCloudSync` — handles sign-in, session creation, partner invite flow, and unsync.
+- **signIn**: reads all local data via `LocalAdapter`, pushes it to Supabase (full settings blob included), clears local copies, swaps adapter to `SupabaseAdapter`. From this point all reads/writes go directly through the cloud adapter — there is no separate periodic sync step.
+- **joinAsPartner**: authenticates, joins an existing session by invite code, swaps adapter to `SupabaseAdapter`, subscribes to settings changes via `adapter.subscribeSettings()` so that if the primary switches mode, the partner UI updates in real time.
+- **unsync**: reads all data from Supabase, writes it to `LocalAdapter`, calls `destroySession()` (disables partner access and deletes cloud data), signs out of Supabase, clears auth metadata from localStorage, swaps adapter back to `LocalAdapter`.
+- Auth metadata (`uid`, `sessionId`, `role`, `inviteCode`, `lastSync`) is stored directly in localStorage via `storage.set/remove`, NOT through the adapter. This keeps it separate from app data so sessions survive `clearData()` calls.
 - The primary user generates a 6-character invite code stored in `luna_invite_code`; a partner joins with that code.
 - User role is stored in `luna_user_role` (`"primary"` or `"partner"`).
 - Last sync timestamp is stored in `luna_cloud_last_sync`.
@@ -151,6 +170,9 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Notification permission is requested lazily on first enable; a hint is shown in Settings if denied.
 
 ### localStorage Keys
+
+**App data keys** (managed by `LocalAdapter`, cleared by `clearData()`):
+
 | Key | Content |
 |-----|---------|
 | `lc_c4` | Contraction history array |
@@ -159,14 +181,15 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 | `lc_ld` | Last drink timestamp |
 | `lc_di` | Active drink interval (minutes) |
 | `lc_iv` | Custom interval list |
-| `luna_mode` | App mode: `"labour"` or `"expectation"` |
-| `luna_locale` | Language: `"en"` or `"uk"` |
-| `luna_due_date` | ISO date string |
-| `luna_countdown_unit` | Countdown display unit (`wks_days` / `days` / `hours`) |
 | `luna_todos` | Task list array |
-| `luna_flags` | Feature flags JSON object |
 | `luna_contacts` | Labour contacts array |
 | `luna_notif_water` | Water notifications enabled: `"1"` or `"0"` |
+| `luna_settings` | Settings JSON blob: `{ locale, mode, dueDate, countdownUnit, flags, reliefMethods, … }` |
+
+**Auth metadata keys** (managed directly via `storage.set/remove` in `useCloudSync`, NOT cleared by `clearData()`):
+
+| Key | Content |
+|-----|---------|
 | `luna_cloud_uid` | Supabase user ID (cloud sync only) |
 | `luna_session_id` | Cloud session ID (cloud sync only) |
 | `luna_user_role` | Session role: `"primary"` or `"partner"` (cloud sync only) |
@@ -210,7 +233,14 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - **Labour mode:** Contractions → Hydration → Relief
 - **Expectation mode:** Expecting (countdown + todos) → Hydration → Relief
 - Tab switching is managed in `App.jsx`; the active component is rendered in the content area.
-- `MethodModal` and `SettingsModal` render as overlays on top of tab content.
+- `MethodModal`, `SettingsModal`, and `ResetModal` render as overlays on top of tab content.
+- `DebugPopup` renders as a fixed-position overlay (bottom of screen) — always on top of everything.
+
+### Data Reset
+- `ResetModal` presents a bottom-sheet with checkboxes for 6 data categories: contractions, hydration, todos, contacts, relief, appSettings.
+- "Select all" convenience checkbox. Confirmation step before clearing.
+- On confirm, calls `useDatabaseContext().clearData(Array.from(selected))`.
+- `clearData` delegates to the active adapter (works for both local and cloud) and then increments `resetKey` to trigger hook reloads.
 
 ### PWA / Caching
 - PWA manifest and Workbox strategy configured in `vite.config.js`.
