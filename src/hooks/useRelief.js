@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDatabase } from "../context/DatabaseContext.jsx";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { DEFAULT_METHODS } from "../constants/index.js";
 
 /**
@@ -8,7 +8,7 @@ import { DEFAULT_METHODS } from "../constants/index.js";
  * when the adapter is swapped to SupabaseAdapter.
  */
 export function useRelief() {
-  const adapter = useDatabase();
+  const { adapter, resetKey } = useDatabaseContext();
   const [methods, setMethods] = useState(DEFAULT_METHODS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
@@ -26,7 +26,7 @@ export function useRelief() {
       }
     });
     return () => { cancelled = true; };
-  }, [adapter]);
+  }, [adapter, resetKey]);
 
   const addMethod = async () => {
     if (!newName.trim()) return;

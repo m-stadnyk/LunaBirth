@@ -1,39 +1,32 @@
 import { useState, useEffect } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 import { FEATURE_FLAGS } from "../constants/featureFlags.js";
 
-const KEY = "luna_flags";
-
-function buildDefaults() {
+export function buildDefaults() {
   return Object.fromEntries(FEATURE_FLAGS.map((f) => [f.id, f.defaultValue]));
 }
 
 export function useFeatureFlagsState() {
+  const { adapter, resetKey } = useDatabaseContext();
   const [flags, setFlags] = useState(buildDefaults);
 
   useEffect(() => {
-    storage.get(KEY).then((stored) => {
-      if (!stored?.value) return;
-      try {
-        const overrides = JSON.parse(stored.value);
-        // Merge so new flags added to constants default to true
-        // even when stored JSON predates them
-        setFlags((prev) => ({ ...prev, ...overrides }));
-      } catch {
-        // Malformed JSON — keep defaults
+    adapter.getSettings().then((settings) => {
+      if (settings?.flags) {
+        setFlags({ ...buildDefaults(), ...settings.flags });
+      } else {
+        setFlags(buildDefaults());
       }
     });
-  }, []);
+  }, [adapter, resetKey]);
 
   const setFlag = (id, value) => {
     setFlags((prev) => {
       const next = { ...prev, [id]: value };
-      storage.set(KEY, JSON.stringify(next));
+      adapter.saveSettings({ flags: next }).catch(() => {});
       return next;
     });
   };
 
   return { flags, setFlag };
 }
-
-export { buildDefaults };

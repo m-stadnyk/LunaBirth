@@ -19,4 +19,11 @@ export const storage = {
       // Storage quota exceeded or private browsing — silently ignore
     }
   },
+  remove: async (key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Silently ignore
+    }
+  },
 };

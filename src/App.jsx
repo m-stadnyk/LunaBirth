@@ -11,14 +11,17 @@ import { useLabourContacts } from "./hooks/useLabourContacts.js";
 import { useNotifications } from "./hooks/useNotifications.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { useAppUpdate } from "./hooks/useAppUpdate.js";
+import { DatabaseProvider } from "./context/DatabaseContext.jsx";
 import { LocaleProvider, useLocaleContext } from "./context/LocaleContext.jsx";
 import { FeatureFlagProvider } from "./context/FeatureFlagContext.jsx";
-import { DatabaseProvider } from "./context/DatabaseContext.jsx";
+import { DebugProvider } from "./context/DebugContext.jsx";
 import { Header } from "./components/Header.jsx";
 import { TabBar } from "./components/TabBar.jsx";
 import { MethodModal } from "./components/MethodModal.jsx";
 import { SettingsModal } from "./components/SettingsModal.jsx";
 import { LabourContactsModal } from "./components/LabourContactsModal.jsx";
+import { DebugPopup } from "./components/DebugPopup.jsx";
+import { ResetModal } from "./components/ResetModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
 import { ReliefTab } from "./features/relief/ReliefTab.jsx";
@@ -44,6 +47,7 @@ function AppInner() {
   const [tab, setTab] = useState("contractions");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
 
   // When mode changes, switch to the appropriate default tab
   useEffect(() => {
@@ -55,9 +59,6 @@ function AppInner() {
   const appUpdate = useAppUpdate();
   const dueDate = useDueDate();
   const cloudSync = useCloudSync({
-    mode,
-    dueDate: dueDate.dueDate,
-    countdownUnit: dueDate.countdownUnit,
     onRemoteModeChange: (newMode) => {
       setMode(newMode);
       if (newMode === "labour" && typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -103,7 +104,6 @@ function AppInner() {
 
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 80px" }}>
 
-          {/* ── Expectation mode ── */}
           {tab === "expecting" && (
             <ExpectationTab
               dueDate={dueDate.dueDate}
@@ -121,7 +121,6 @@ function AppInner() {
             />
           )}
 
-          {/* ── Labour mode ── */}
           {tab === "contractions" && (
             <ContractionsTab
               contractions={contractions.contractions}
@@ -136,7 +135,6 @@ function AppInner() {
             />
           )}
 
-          {/* ── Shared tabs ── */}
           {tab === "hydration" && (
             <HydrationTab
               drinkInterval={hydration.drinkInterval}
@@ -190,20 +188,18 @@ function AppInner() {
           notifications={notifications}
           cloudSync={cloudSync}
           appUpdate={appUpdate}
-          onClearTodos={todos.clearTodos}
+          onOpenResetModal={() => { setSettingsOpen(false); setResetOpen(true); }}
         />
 
-        {/* Version badge — always visible at the bottom of the viewport */}
-        <div
-          style={{
-            position: "fixed",
-            bottom: 6,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1,
-            pointerEvents: "none",
-          }}
-        >
+        <ResetModal open={resetOpen} onClose={() => setResetOpen(false)} />
+
+        <DebugPopup />
+
+        {/* Version badge */}
+        <div style={{
+          position: "fixed", bottom: 6, left: "50%", transform: "translateX(-50%)",
+          zIndex: 1, pointerEvents: "none",
+        }}>
           <span style={{ fontSize: 10, color: N.muted, opacity: 0.4, letterSpacing: "0.04em" }}>
             v{__APP_VERSION__}
           </span>
@@ -219,14 +215,21 @@ function AppInner() {
   );
 }
 
+/**
+ * Provider order: DatabaseProvider is outermost so all inner contexts
+ * (LocaleProvider, FeatureFlagProvider) can use the active adapter for persistence.
+ * DebugProvider must wrap AppInner so hooks inside AppInner can call useDebug().
+ */
 export default function App() {
   return (
-    <LocaleProvider>
-      <FeatureFlagProvider>
-        <DatabaseProvider>
-          <AppInner />
-        </DatabaseProvider>
-      </FeatureFlagProvider>
-    </LocaleProvider>
+    <DatabaseProvider>
+      <LocaleProvider>
+        <FeatureFlagProvider>
+          <DebugProvider>
+            <AppInner />
+          </DebugProvider>
+        </FeatureFlagProvider>
+      </LocaleProvider>
+    </DatabaseProvider>
   );
 }

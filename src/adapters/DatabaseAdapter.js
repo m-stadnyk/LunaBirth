@@ -53,6 +53,13 @@ export class DatabaseAdapter {
    */
   async getSessionId() { throw new Error("Not implemented"); }
 
+  /**
+   * Permanently delete all session data from the provider and invalidate the session.
+   * Used when the primary user unsyncs — clears cloud data so orphaned sessions don't persist.
+   * @returns {Promise<void>}
+   */
+  async destroySession() { throw new Error("Not implemented"); }
+
   // ─── Contractions ──────────────────────────────────────────────────────────
 
   /**
@@ -115,17 +122,28 @@ export class DatabaseAdapter {
   // ─── Settings ──────────────────────────────────────────────────────────────
 
   /**
-   * Persist app settings (mode, locale, due date, countdown unit, relief methods).
-   * @param {object} settings
+   * Partially persist app settings. Only the provided keys are written;
+   * existing keys not present in the argument are preserved (merge semantic).
+   *
+   * Supported keys: mode, locale, dueDate, countdownUnit, reliefMethods, flags.
+   *
+   * @param {object} partialSettings
    * @returns {Promise<void>}
    */
-  async saveSettings(settings) { throw new Error("Not implemented"); } // eslint-disable-line no-unused-vars
+  async saveSettings(partialSettings) { throw new Error("Not implemented"); } // eslint-disable-line no-unused-vars
 
   /**
-   * Load stored settings.
-   * @returns {Promise<object|null>}
+   * Load all stored settings.
+   * @returns {Promise<{ mode, locale, dueDate, countdownUnit, reliefMethods, flags }|null>}
    */
   async getSettings() { throw new Error("Not implemented"); }
+
+  /**
+   * Clear specific categories of data.
+   * @param {Array<"contractions"|"hydration"|"todos"|"contacts"|"relief"|"appSettings"|"all">} categories
+   * @returns {Promise<void>}
+   */
+  async clearData(categories) { throw new Error("Not implemented"); } // eslint-disable-line no-unused-vars
 
   // ─── Labour Contacts ───────────────────────────────────────────────────────
 

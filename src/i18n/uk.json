@@ -124,27 +124,41 @@
     "cloudSyncLabel": "Хмарна синхронізація",
     "cloudSyncStart": "Синхронізувати та поділитися",
     "cloudSyncInviteCode": "Код запрошення: {{code}}",
+    "cloudSyncPartnerCode": "Код для партнера",
     "cloudSyncJoinLabel": "Приєднатися як партнер",
     "cloudSyncJoinPlaceholder": "Введіть 6-значний код",
     "cloudSyncJoin": "Приєднатися",
-    "cloudSyncSignOut": "Вийти з синхронізації",
+    "cloudSyncUnsync": "Відключитися від хмари",
+    "cloudSyncUnsyncHint": "Завантажує ваші дані локально та видаляє хмарну сесію.",
     "cloudSyncLastSynced": "Остання синхронізація: {{time}}",
     "cloudSyncSyncing": "Синхронізація…",
     "cloudSyncError": "Помилка синхронізації. Спробуйте ще раз.",
     "cloudSyncSignedIn": "Синхронізовано з хмарою",
     "cloudSyncPrivacyNote": "Обліковий запис не потрібен. Дані зберігаються анонімно.",
-    "cloudSyncSyncNow": "Синхронізувати",
     "cloudSyncRolePartner": "Підключено як партнер",
     "dataLabel": "Дані",
-    "clearTodosBtn": "Очистити всі завдання",
-    "clearTodosConfirmText": "Це назавжди видалить усі завдання. Ви впевнені?",
-    "clearTodosYes": "Так, очистити",
-    "clearTodosCancel": "Скасувати",
+    "resetDataBtn": "Скинути дані застосунку…",
     "appVersionLabel": "Версія застосунку",
     "checkForUpdates": "Перевірити оновлення",
     "updateChecking": "Перевірка…",
     "updateUpToDate": "У вас остання версія",
     "updateAvailable": "Знайдено оновлення — перезавантаження…"
+  },
+  "reset": {
+    "title": "Скидання даних",
+    "subtitle": "Оберіть, що хочете очистити. Це незворотно.",
+    "selectAll": "Вибрати все",
+    "contractions": "Історія переймів",
+    "hydration": "Дані про воду",
+    "todos": "Завдання / список справ",
+    "contacts": "Контакти для пологів",
+    "relief": "Методи знеболення",
+    "appSettings": "Налаштування застосунку (режим, дата пологів)",
+    "clearBtn": "Очистити {{n}} вибраних",
+    "confirmText": "Це назавжди видалить вибрані дані. Ви впевнені?",
+    "confirmYes": "Так, видалити",
+    "clearing": "Очищення…",
+    "cancel": "Скасувати"
   },
   "notifications": {
     "waterTitle": "Час пити! 💧",
@@ -154,7 +168,9 @@
       "body": "Ваш партнер перейшов у режим пологів. Відкрийте застосунок."
     }
   },
-  "flags": {},
+  "flags": {
+    "debugPopup": "Спливаюче вікно для налагодження"
+  },
   "contacts": {
     "title": "Контакти для пологів",
     "noContacts": "Контактів ще немає. Додайте акушерку, доулу або партнера.",

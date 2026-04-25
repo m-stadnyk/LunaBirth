@@ -1,23 +1,25 @@
 import { useState, useEffect } from "react";
-import { storage } from "../utils/storage.js";
+import { useDatabaseContext } from "../context/DatabaseContext.jsx";
 
-const KEY = "luna_locale";
 export const SUPPORTED_LOCALES = ["en", "uk"];
 
 export function useLocale() {
+  const { adapter, resetKey } = useDatabaseContext();
   const [locale, setLocaleState] = useState("en");
 
   useEffect(() => {
-    storage.get(KEY).then((stored) => {
-      if (SUPPORTED_LOCALES.includes(stored?.value)) {
-        setLocaleState(stored.value);
+    adapter.getSettings().then((settings) => {
+      if (SUPPORTED_LOCALES.includes(settings?.locale)) {
+        setLocaleState(settings.locale);
+      } else {
+        setLocaleState("en");
       }
     });
-  }, []);
+  }, [adapter, resetKey]);
 
   const setLocale = (next) => {
     setLocaleState(next);
-    storage.set(KEY, next);
+    adapter.saveSettings({ locale: next }).catch(() => {});
   };
 
   return { locale, setLocale, supportedLocales: SUPPORTED_LOCALES };

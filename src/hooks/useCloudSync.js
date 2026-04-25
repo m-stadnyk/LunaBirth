@@ -2,8 +2,11 @@ import { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { storage } from "../utils/storage.js";
 import { DatabaseContext } from "../context/DatabaseContext.jsx";
 import { LocalAdapter } from "../adapters/LocalAdapter.js";
+import { useDebug } from "../context/DebugContext.jsx";
 
-const KEYS = {
+// Auth-metadata keys — stored directly in localStorage, not through the adapter.
+// These survive clearData() so the session can be restored on reload.
+const AUTH_KEYS = {
   uid: "luna_cloud_uid",
   sessionId: "luna_session_id",
   role: "luna_user_role",
@@ -11,24 +14,48 @@ const KEYS = {
   inviteCode: "luna_invite_code",
 };
 
-const HYDRATION_DEFAULTS = { drinkCount: 0, lastDrank: Date.now(), drinkInterval: 15, intervals: [5, 15, 30] };
+const HYDRATION_DEFAULTS = {
+  drinkCount: 0,
+  lastDrank: Date.now(),
+  drinkInterval: 15,
+  intervals: [5, 15, 30],
+};
+
+async function writeAuthKeys({ uid, sessionId, role, inviteCode }) {
+  await Promise.all([
+    storage.set(AUTH_KEYS.uid, uid),
+    storage.set(AUTH_KEYS.sessionId, sessionId),
+    storage.set(AUTH_KEYS.role, role),
+    storage.set(AUTH_KEYS.inviteCode, inviteCode),
+    storage.set(AUTH_KEYS.lastSync, String(Date.now())),
+  ]);
+}
+
+async function clearAuthKeys() {
+  await Promise.all(Object.values(AUTH_KEYS).map((k) => storage.remove(k)));
+}
 
 /**
- * Manages cloud authentication, session sharing, and manual sync.
+ * Manages cloud authentication, session creation, partner join, and unsync.
+ *
+ * Architecture:
+ * - All app data flows through the active adapter (LocalAdapter or SupabaseAdapter).
+ * - On signIn: local data is pushed to Supabase, local data is cleared, adapter swaps.
+ * - On unsync: Supabase data is pulled to local, cloud session is destroyed, adapter swaps.
+ * - Auth metadata (uid, sessionId, role, inviteCode) lives in localStorage separately
+ *   from app data so sessions survive page reloads.
  *
  * @param {object} [options]
- * @param {string} [options.mode]               Current app mode ("labour"|"expectation").
- * @param {string} [options.dueDate]            Current due date ISO string.
- * @param {string} [options.countdownUnit]      Current countdown unit preference.
- * @param {function} [options.onRemoteModeChange]  Called when partner detects primary switched modes.
+ * @param {function} [options.onRemoteModeChange] Called when partner detects primary switched modes.
  */
-export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange } = {}) {
+export function useCloudSync({ onRemoteModeChange } = {}) {
   const { setAdapter } = useContext(DatabaseContext);
+  const { pushError } = useDebug();
 
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [inviteCode, setInviteCode] = useState(null);
-  const [role, setRole] = useState(null); // "primary" | "partner"
+  const [role, setRole] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
   const [error, setError] = useState(null);
@@ -36,13 +63,10 @@ export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange 
   const adapterRef = useRef(null);
   const settingsUnsubRef = useRef(null);
 
-  // ── Settings subscription (partner) ─────────────────────────────────────────
+  // ── Settings subscription for partner mode ────────────────────────────────
 
   const setupSettingsSubscription = useCallback((adapter) => {
-    if (settingsUnsubRef.current) {
-      settingsUnsubRef.current();
-      settingsUnsubRef.current = null;
-    }
+    settingsUnsubRef.current?.();
     settingsUnsubRef.current = adapter.subscribeSettings((settings) => {
       if (settings.mode && onRemoteModeChange) {
         onRemoteModeChange(settings.mode);
@@ -50,85 +74,64 @@ export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange 
     });
   }, [onRemoteModeChange]);
 
-  // ── Restore persisted session on mount ────────────────────────────────────────
+  // ── Restore persisted session on mount ────────────────────────────────────
 
   useEffect(() => {
     (async () => {
       const [uid, sid, r, ls, ic] = await Promise.all([
-        storage.get(KEYS.uid),
-        storage.get(KEYS.sessionId),
-        storage.get(KEYS.role),
-        storage.get(KEYS.lastSync),
-        storage.get(KEYS.inviteCode),
+        storage.get(AUTH_KEYS.uid),
+        storage.get(AUTH_KEYS.sessionId),
+        storage.get(AUTH_KEYS.role),
+        storage.get(AUTH_KEYS.lastSync),
+        storage.get(AUTH_KEYS.inviteCode),
       ]);
 
-      if (uid?.value && sid?.value) {
-        try {
-          const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
-          const adapter = new SupabaseAdapter();
-          const user = await adapter.getCurrentUser();
-          if (!user) throw new Error("Session expired");
+      if (!uid?.value || !sid?.value) return;
 
-          const restoredRole = r?.value ?? "primary";
-          adapter.restoreSession(sid.value, restoredRole);
-          adapterRef.current = adapter;
-          setAdapter(adapter);
-          setIsSignedIn(true);
-          setSessionId(sid.value);
-          setRole(restoredRole);
-          setLastSynced(ls?.value ? +ls.value : null);
-          setInviteCode(ic?.value ?? null);
+      try {
+        const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
+        const adapter = new SupabaseAdapter();
 
-          if (restoredRole === "partner") {
-            setupSettingsSubscription(adapter);
-          }
-        } catch {
-          // Credentials expired or network error — stay in local mode
+        // Supabase persists auth state in its own localStorage; getCurrentUser()
+        // works without a fresh sign-in on page reload.
+        const user = await adapter.getCurrentUser();
+        if (!user) throw new Error("Session expired");
+
+        const restoredRole = r?.value || "primary";
+        adapter.restoreSession(sid.value, restoredRole);
+        adapterRef.current = adapter;
+        setAdapter(adapter);
+        setIsSignedIn(true);
+        setSessionId(sid.value);
+        setRole(restoredRole);
+        setLastSynced(ls?.value ? +ls.value : null);
+        setInviteCode(ic?.value || null);
+
+        if (restoredRole === "partner") {
+          setupSettingsSubscription(adapter);
         }
+      } catch {
+        // Credentials expired or network error — silently remain in local mode
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-sync mode for primary ────────────────────────────────────────────────
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!isSignedIn || role !== "primary" || !mode || !adapterRef.current) return;
-    adapterRef.current.saveSettings({ mode }).catch(() => {});
-  }, [mode, isSignedIn, role]);
+  useEffect(() => () => { settingsUnsubRef.current?.(); }, []);
 
-  // ── Auto-sync dueDate + countdownUnit for primary ─────────────────────────────
-  // useDueDate writes directly to localStorage (bypasses the adapter), so we
-  // mirror changes to Supabase here whenever the primary is signed in.
-
-  useEffect(() => {
-    if (!isSignedIn || role !== "primary" || !adapterRef.current) return;
-    if (dueDate === undefined && countdownUnit === undefined) return;
-    adapterRef.current.saveSettings({ dueDate, countdownUnit }).catch(() => {});
-  }, [dueDate, countdownUnit, isSignedIn, role]);
-
-  // ── Cleanup on unmount ────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    return () => {
-      if (settingsUnsubRef.current) {
-        settingsUnsubRef.current();
-        settingsUnsubRef.current = null;
-      }
-    };
-  }, []);
-
-  // ── signIn (primary) ─────────────────────────────────────────────────────────
+  // ── signIn — upload local data to Supabase, create shared session ─────────
 
   const signIn = useCallback(async () => {
     setError(null);
     setSyncing(true);
     try {
       const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
-      const adapter = new SupabaseAdapter();
-      const { userId } = await adapter.signInAnonymously();
-      const { sessionId: sid, inviteCode: code } = await adapter.createSession();
+      const cloudAdapter = new SupabaseAdapter();
+      const { userId } = await cloudAdapter.signInAnonymously();
+      const { sessionId: sid, inviteCode: code } = await cloudAdapter.createSession();
 
-      // Push all local data to cloud immediately after creating session
+      // Read everything from local before swapping adapter
       const local = new LocalAdapter();
       const [contractions, hydration, todos, settings, contacts] = await Promise.all([
         local.getContractions(),
@@ -138,188 +141,117 @@ export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange 
         local.getContacts(),
       ]);
 
+      // Push all data (including all settings fields) to the cloud session
       await Promise.all([
-        adapter.saveContractions(contractions),
-        adapter.saveHydration(hydration ?? {}),
-        adapter.saveTodos(todos),
-        adapter.saveSettings({ ...(settings ?? {}), mode }),
-        adapter.saveContacts(contacts),
+        cloudAdapter.saveContractions(contractions),
+        cloudAdapter.saveHydration(hydration ?? HYDRATION_DEFAULTS),
+        cloudAdapter.saveTodos(todos),
+        cloudAdapter.saveSettings(settings ?? {}),
+        cloudAdapter.saveContacts(contacts),
       ]);
 
-      const now = Date.now();
-      await Promise.all([
-        storage.set(KEYS.uid, userId),
-        storage.set(KEYS.sessionId, sid),
-        storage.set(KEYS.role, "primary"),
-        storage.set(KEYS.lastSync, String(now)),
-        storage.set(KEYS.inviteCode, code),
-      ]);
+      // Clear local data — it now lives exclusively in Supabase
+      await local.clearData(["contractions", "hydration", "todos", "contacts", "relief", "appSettings"]);
 
-      adapterRef.current = adapter;
-      setAdapter(adapter);
+      await writeAuthKeys({ uid: userId, sessionId: sid, role: "primary", inviteCode: code });
 
-      // Best-effort: clear local copies now that data lives in the cloud.
-      // Settings keys are intentionally excluded — useAppMode/useDueDate read them directly.
-      try {
-        await Promise.all([
-          local.saveTodos([]),
-          local.saveContractions([]),
-          local.saveContacts([]),
-          local.saveHydration({ drinkCount: 0, lastDrank: Date.now(), drinkInterval: 15, intervals: [5, 15, 30] }),
-        ]);
-      } catch {
-        // Cleanup is best-effort; ignore any errors
-      }
-
+      adapterRef.current = cloudAdapter;
+      setAdapter(cloudAdapter);
       setIsSignedIn(true);
       setSessionId(sid);
       setInviteCode(code);
       setRole("primary");
-      setLastSynced(now);
+      setLastSynced(Date.now());
     } catch (err) {
-      setError(err.message ?? "Sign-in failed");
+      const msg = err.message ?? "Sign-in failed";
+      setError(msg);
+      pushError(`Cloud sync: ${msg}`);
     } finally {
       setSyncing(false);
     }
-  }, [setAdapter, mode]);
+  }, [setAdapter, pushError]);
 
-  // ── joinAsPartner ─────────────────────────────────────────────────────────────
+  // ── joinAsPartner — connect to an existing primary session ────────────────
 
   const joinAsPartner = useCallback(async (code) => {
     setError(null);
     setSyncing(true);
     try {
       const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
-      const adapter = new SupabaseAdapter();
-      const { userId } = await adapter.signInAnonymously();
-      const { sessionId: sid } = await adapter.joinSession(code);
+      const cloudAdapter = new SupabaseAdapter();
+      const { userId } = await cloudAdapter.signInAnonymously();
+      const { sessionId: sid } = await cloudAdapter.joinSession(code);
 
-      const now = Date.now();
-      await Promise.all([
-        storage.set(KEYS.uid, userId),
-        storage.set(KEYS.sessionId, sid),
-        storage.set(KEYS.role, "partner"),
-        storage.set(KEYS.lastSync, String(now)),
-        storage.set(KEYS.inviteCode, code),
-      ]);
+      await writeAuthKeys({ uid: userId, sessionId: sid, role: "partner", inviteCode: code });
 
-      adapterRef.current = adapter;
-      setAdapter(adapter);
+      adapterRef.current = cloudAdapter;
+      setAdapter(cloudAdapter);
       setIsSignedIn(true);
       setSessionId(sid);
       setInviteCode(code);
       setRole("partner");
-      setLastSynced(now);
+      setLastSynced(Date.now());
 
-      setupSettingsSubscription(adapter);
+      setupSettingsSubscription(cloudAdapter);
     } catch (err) {
-      setError(err.message ?? "Failed to join session");
+      const msg = err.message ?? "Failed to join session";
+      setError(msg);
+      pushError(`Partner join: ${msg}`);
     } finally {
       setSyncing(false);
     }
-  }, [setAdapter, setupSettingsSubscription]);
+  }, [setAdapter, setupSettingsSubscription, pushError]);
 
-  // ── sync (primary manual push) ────────────────────────────────────────────────
+  // ── unsync — download cloud data to local, destroy session, go offline ────
 
-  const sync = useCallback(async () => {
-    if (!isSignedIn || role === "partner") return;
+  const unsync = useCallback(async () => {
     setError(null);
     setSyncing(true);
-    try {
-      const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
-      const adapter = new SupabaseAdapter();
-      const local = new LocalAdapter();
-      const [contractions, hydration, todos, settings] = await Promise.all([
-        local.getContractions(),
-        local.getHydration(),
-        local.getTodos(),
-        local.getSettings(),
-      ]);
-      await Promise.all([
-        adapter.saveContractions(contractions),
-        adapter.saveHydration(hydration ?? {}),
-        adapter.saveTodos(todos),
-        adapter.saveSettings(settings ?? {}),
-      ]);
-      const now = Date.now();
-      await storage.set(KEYS.lastSync, String(now));
-      setLastSynced(now);
-    } catch (err) {
-      setError(err.message ?? "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  }, [isSignedIn, role]);
 
-  // ── signOut ───────────────────────────────────────────────────────────────────
+    settingsUnsubRef.current?.();
+    settingsUnsubRef.current = null;
 
-  const signOut = useCallback(async () => {
-    setError(null);
-
-    // ── Cloud → Local migration ────────────────────────────────────────────────
-    // Fetch all cloud data before disconnecting so the user retains their data
-    // in local mode. Uses adapterRef.current (has #sessionId); skip if null.
-    // One LocalAdapter instance is created here and reused for setAdapter below.
     const localAdapter = new LocalAdapter();
+
     if (adapterRef.current) {
       try {
-        const [contractions, hydration, todos, contacts, cloudSettings, localSettings] =
-          await Promise.all([
-            adapterRef.current.getContractions(),
-            adapterRef.current.getHydration(),
-            adapterRef.current.getTodos(),
-            adapterRef.current.getContacts(),
-            adapterRef.current.getSettings(),
-            localAdapter.getSettings(),
-          ]);
+        const [contractions, hydration, todos, contacts, settings] = await Promise.all([
+          adapterRef.current.getContractions(),
+          adapterRef.current.getHydration(),
+          adapterRef.current.getTodos(),
+          adapterRef.current.getContacts(),
+          adapterRef.current.getSettings(),
+        ]);
+
         await Promise.all([
           localAdapter.saveContractions(contractions ?? []),
           localAdapter.saveHydration(hydration ?? { ...HYDRATION_DEFAULTS, lastDrank: Date.now() }),
           localAdapter.saveTodos(todos ?? []),
           localAdapter.saveContacts(contacts ?? []),
-          // Merge: prefer local values for adapter-bypassing fields (dueDate, mode, locale,
-          // countdownUnit, flags); take reliefMethods from cloud since useRelief is adapter-managed.
-          localAdapter.saveSettings({
-            ...(localSettings ?? {}),
-            reliefMethods: cloudSettings?.reliefMethods,
-          }),
+          localAdapter.saveSettings(settings ?? {}),
         ]);
-      } catch {
-        // Migration is best-effort — proceed with sign-out regardless
+
+        // Destroy the cloud session (disables partner access and clears cloud data)
+        await adapterRef.current.destroySession();
+        await adapterRef.current.signOut();
+      } catch (err) {
+        const msg = err.message ?? "Failed to unsync cleanly";
+        pushError(`Unsync: ${msg}`);
+        // Continue with unsync regardless — we still switch to local mode
       }
     }
 
-    // Tear down settings subscription before clearing state
-    if (settingsUnsubRef.current) {
-      settingsUnsubRef.current();
-      settingsUnsubRef.current = null;
-    }
-
-    try {
-      const { SupabaseAdapter } = await import("../adapters/SupabaseAdapter.js");
-      const adapter = new SupabaseAdapter();
-      await adapter.signOut();
-    } catch {
-      // Best-effort sign-out — proceed regardless
-    }
-
-    // Clear persisted cloud credentials
-    await Promise.all([
-      storage.set(KEYS.uid, ""),
-      storage.set(KEYS.sessionId, ""),
-      storage.set(KEYS.role, ""),
-      storage.set(KEYS.lastSync, ""),
-      storage.set(KEYS.inviteCode, ""),
-    ]);
+    await clearAuthKeys();
 
     adapterRef.current = null;
-    setAdapter(localAdapter); // reuse the instance that received migrated data
+    setAdapter(localAdapter);
     setIsSignedIn(false);
     setSessionId(null);
     setInviteCode(null);
     setRole(null);
     setLastSynced(null);
-  }, [setAdapter]);
+    setSyncing(false);
+  }, [setAdapter, pushError]);
 
   return {
     isSignedIn,
@@ -331,7 +263,8 @@ export function useCloudSync({ mode, dueDate, countdownUnit, onRemoteModeChange 
     error,
     signIn,
     joinAsPartner,
-    sync,
-    signOut,
+    unsync,
+    // Keep signOut as an alias so existing callsites don't break
+    signOut: unsync,
   };
 }
