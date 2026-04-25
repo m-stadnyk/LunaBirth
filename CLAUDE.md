@@ -181,10 +181,16 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 | `lc_ld` | Last drink timestamp |
 | `lc_di` | Active drink interval (minutes) |
 | `lc_iv` | Custom interval list |
+| `luna_mode` | App mode: `"labour"` or `"expectation"` |
+| `luna_locale` | Language: `"en"` or `"uk"` |
+| `luna_due_date` | ISO date string |
+| `luna_countdown_unit` | Countdown display unit (`wks_days` / `days` / `hours`) |
 | `luna_todos` | Task list array |
+| `luna_flags` | Feature flags JSON object |
 | `luna_contacts` | Labour contacts array |
 | `luna_notif_water` | Water notifications enabled: `"1"` or `"0"` |
-| `luna_settings` | Settings JSON blob: `{ locale, mode, dueDate, countdownUnit, flags, reliefMethods, … }` |
+
+> Note: `LocalAdapter` stores settings as individual keys. `SupabaseAdapter` stores them as a single JSON blob in the `snapshots` table under key `appSettings`.
 
 **Auth metadata keys** (managed directly via `storage.set/remove` in `useCloudSync`, NOT cleared by `clearData()`):
 
