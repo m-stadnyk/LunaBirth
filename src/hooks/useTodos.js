@@ -19,7 +19,7 @@ export function useTodos() {
       if (!cancelled && data?.length) setTodosRaw(sortTodos(data));
     });
     const unsub = adapter.subscribeTodos((data) => {
-      setTodosRaw(sortTodos(data));
+      if (!cancelled) setTodosRaw(sortTodos(data));
     });
     return () => {
       cancelled = true;
@@ -29,11 +29,8 @@ export function useTodos() {
 
   const setTodos = (next) => {
     const sorted = sortTodos(next);
-    const previous = todos;
     setTodosRaw(sorted);
-    adapter.saveTodos(sorted).catch(() => {
-      setTodosRaw(previous);
-    });
+    adapter.saveTodos(sorted).catch(() => {});
   };
 
   const addTodo = (text) => {
