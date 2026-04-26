@@ -164,10 +164,11 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Cloud sync is entirely opt-in; removing Supabase credentials leaves the app fully functional via localStorage.
 
 ### Notifications
-- Managed by `useNotifications` — wraps the browser Notification API.
-- Used for water reminder alerts; fires when the hydration countdown expires if permission is granted.
-- Enabled state persists to `luna_notif_water` (`"1"` / `"0"`).
-- Notification permission is requested lazily on first enable; a hint is shown in Settings if denied.
+- Managed by `useNotifications` — two independent alert channels for water reminders:
+  1. **Push notifications** (browser Notification API): toggled via `enabled`/`toggle()`. Requires browser permission, requested lazily on first enable. Uses `tag: "luna-water"` so a new alert replaces the previous one instead of stacking. Persists to `luna_notif_water`.
+  2. **Audio alert** (Web Audio API): toggled via `audioEnabled`/`toggleAudio()`. No permission required. Plays a two-note E5→C5 chime and stops any currently playing tone before starting a new one (no stacking). Persists to `luna_notif_water_audio`.
+- Both channels can be enabled independently; `notifyWater()` fires all enabled channels at once.
+- A hint is shown in Settings if push permission is denied.
 
 ### localStorage Keys
 
@@ -188,7 +189,8 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 | `luna_todos` | Task list array |
 | `luna_flags` | Feature flags JSON object |
 | `luna_contacts` | Labour contacts array |
-| `luna_notif_water` | Water notifications enabled: `"1"` or `"0"` |
+| `luna_notif_water` | Water push notifications enabled: `"1"` or `"0"` |
+| `luna_notif_water_audio` | Water audio alert enabled: `"1"` or `"0"` |
 
 > Note: `LocalAdapter` stores settings as individual keys. `SupabaseAdapter` stores them as a single JSON blob in the `snapshots` table under key `appSettings`.
 

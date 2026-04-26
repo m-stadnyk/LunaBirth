@@ -65,6 +65,11 @@ function NotificationsSection({ notifications, t }) {
           onChange={() => notifications.toggle()}
           disabled={isDenied}
         />
+        <ToggleRow
+          label={t("settings.audioNotifLabel")}
+          checked={notifications.audioEnabled}
+          onChange={() => notifications.toggleAudio()}
+        />
         {isDenied && (
           <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
             {t("settings.notifDeniedHint")}
