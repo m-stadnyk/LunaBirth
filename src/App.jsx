@@ -143,7 +143,6 @@ function AppInner() {
               setCustomVal={hydration.setCustomVal}
               showCustomInput={hydration.showCustomInput}
               setShowCustomInput={hydration.setShowCustomInput}
-              drinkCount={hydration.drinkCount}
               secsLeft={hydration.secsLeft}
               drinkAlert={hydration.drinkAlert}
               drinkSuggestion={hydration.drinkSuggestion}

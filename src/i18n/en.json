@@ -120,6 +120,7 @@
     "noFlags": "No feature flags configured yet.",
     "notificationsLabel": "Notifications",
     "waterNotifLabel": "Water reminder notifications",
+    "audioNotifLabel": "Water reminder audio alert",
     "notifDeniedHint": "Notifications blocked — enable them in your browser settings.",
     "cloudSyncLabel": "Cloud Sync",
     "cloudSyncStart": "Sync & share session",

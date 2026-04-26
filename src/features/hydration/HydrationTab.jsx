@@ -13,7 +13,6 @@ export function HydrationTab({
   setCustomVal,
   showCustomInput,
   setShowCustomInput,
-  drinkCount,
   secsLeft,
   drinkAlert,
   drinkSuggestion,
@@ -116,12 +115,6 @@ export function HydrationTab({
           }}>
             {drinkAlert ? t("hydration.drinkNow") : t("hydration.untilNextSip")}
           </p>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", flexWrap: "wrap", gap: "0 6px", marginTop: 6 }}>
-            <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, color: N.gold }}>
-              {drinkCount}
-            </span>
-            <span style={{ color: N.muted, fontSize: 13 }}>{t("hydration.glassesToday")}</span>
-          </div>
         </div>
         <button
           className={drinkAlert ? "alertPulse" : ""}
