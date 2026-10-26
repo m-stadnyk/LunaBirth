@@ -389,6 +389,20 @@ Use `npm version <patch|minor|major> --no-git-tag-version` before opening a PR w
 
 ---
 
+## Claude Code Skills
+
+Project skills live in `.claude/skills/` (vendored from [mattpocock/skills](https://github.com/mattpocock/skills), MIT — see `.claude/skills/LICENSE-mattpocock-skills`):
+
+| Skill | Invocation | Purpose |
+|-------|-----------|---------|
+| `grill-with-docs` | `/grill-with-docs` (user-only) | Interview session that stress-tests a plan; loads `grilling` + `domain-modeling` |
+| `grilling` | `/grilling` or model-invoked | Round-based design-tree interview with recommended answers |
+| `domain-modeling` | `/domain-modeling` or model-invoked | Sharpens terminology; writes `GLOSSARY.md` (repo root) and ADRs in `docs/adr/` lazily |
+
+`GLOSSARY.md` and `docs/adr/` do not exist yet — they're created the first time a term is resolved or an ADR is needed.
+
+---
+
 ## Roadmap (TODO.md)
 
 - Birth keepsake PDF generator
