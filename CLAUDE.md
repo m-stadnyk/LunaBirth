@@ -33,6 +33,7 @@ src/
 ├── constants/              # Static data (affirmations, pain methods, phase configs)
 │   ├── affirmations.js     # 12 English labour affirmations
 │   ├── affirmations_uk.js  # 14 Ukrainian labour affirmations
+│   ├── contractionRules.js # 5-1-1 / 4-1-1 / 3-1-1 rule thresholds, series break (60 min)
 │   ├── featureFlags.js     # Feature flag definitions (labels, defaults)
 │   ├── methods.js          # 8 default pain relief methods
 │   ├── phases.js           # Phase configs: tracking/early/active/transition
@@ -46,17 +47,22 @@ src/
 │   └── index.js            # Two palettes: N (night-sky/dark) and P (legacy warm)
 ├── utils/                  # Pure functions: formatters, phase analysis, i18n, media
 │   ├── countdown.js        # computeCountdown(dueDate, now, unit)
+│   ├── cloudConfig.js      # isCloudConfigured() — Supabase env vars present?
+│   ├── feedback.js         # getFeedbackEmail, buildFeedbackLink (mailto)
 │   ├── formatters.js       # fmtSec, fmtMMSS
 │   ├── i18n.js             # getNestedValue, createTranslator
 │   ├── media.js            # getMediaType(url), getYtId(url)
-│   ├── phaseAnalysis.js    # computePhase, computeStats, sortByPhase
+│   ├── notify.js           # showNotification — SW registration first (mobile), constructor fallback
+│   ├── phaseAnalysis.js    # currentSeries, isRuleMet, computePhase, computeStats, sortByPhase
 │   ├── storage.js          # Async localStorage wrapper (get/set/remove)
 │   └── todoSorter.js       # sortTodos, groupByArea (keyword-based categorization)
 ├── hooks/                  # Stateful logic
 │   ├── useAffirmations.js  # Locale-aware affirmation rotation (9s interval)
 │   ├── useAppMode.js       # Labour ↔ expectation mode toggle (persists via adapter settings)
+│   ├── useAppUpdate.js     # Prompt-based PWA updates: updateAvailable / applyUpdate (never auto-reloads)
 │   ├── useCloudSync.js     # Supabase auth, session sharing, partner invite, unsync
-│   ├── useContractions.js  # Contraction timer, phase detection, stats
+│   ├── useContractionRule.js # Selected contraction rule (persists via adapter settings)
+│   ├── useContractions.js  # Contraction timer (in-progress start persisted), phase detection, stats
 │   ├── useDueDate.js       # Due date + countdown unit management (persists via adapter settings)
 │   ├── useFeatureFlags.js  # Feature flag state (persists via adapter settings)
 │   ├── useHydration.js     # Water reminder timer, drink logging, intervals
@@ -70,9 +76,11 @@ src/
 │   ├── Header.jsx          # Title, affirmation, mode toggle, settings button
 │   ├── TabBar.jsx          # Tab navigation (different tabs per mode)
 │   ├── ModeToggle.jsx      # Labour (✦) ↔ Expecting (☽) switcher
-│   ├── SettingsModal.jsx   # Language, notifications, cloud sync, feature flags, data reset button
+│   ├── SettingsModal.jsx   # Language, contraction rule, notifications, cloud sync (flag-gated), feature flags, data reset, feedback, version
 │   ├── ResetModal.jsx      # Bottom-sheet modal: checkbox selection of data categories to clear
 │   ├── DebugPopup.jsx      # Fixed-position error cards (visible only when debugPopup flag is on)
+│   ├── ErrorBoundary.jsx   # Top-level render-error recovery screen with Reload
+│   ├── UpdateBanner.jsx    # "New version ready — Update now" banner
 │   ├── LabourContactsModal.jsx # Contacts popup: add/remove/call (tel: links), Contact Picker API on Android
 │   ├── MethodModal.jsx     # Full-screen relief method viewer with media
 │   ├── MediaDisplay.jsx    # YouTube / Spotify / image / link embeds
@@ -128,13 +136,15 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Feature hooks (`useContractions`, `useTodos`, `useHydration`, `useRelief`, `useLocale`, `useFeatureFlags`, `useAppMode`, `useDueDate`) all call `adapter.getX()` / `adapter.saveX()`. Settings-type hooks (locale, flags, mode, dueDate) call `adapter.getSettings()` / `adapter.saveSettings({ field })`.
 - When adapter changes (e.g. partner joins and context swaps to `SupabaseAdapter`), hooks re-hydrate automatically because `adapter` is in their `useEffect` dependency array.
 - `DatabaseContext` also exposes `resetKey` (an integer) and `clearData(categories)`. `resetKey` increments after every `clearData()` call — hooks include it in their effect deps so they automatically reload after a data reset.
-- Provider order matters: `DatabaseProvider` wraps everything. `LocaleProvider`, `FeatureFlagProvider`, and `DebugProvider` are nested inside so they can access the adapter and error queue.
+- Provider order matters: `DatabaseProvider` > `DebugProvider` > `LocaleProvider` > `FeatureFlagProvider` > `ErrorBoundary` > `AppInner`, so every persisting hook can reach the adapter and report errors.
+- Load effects must apply whatever the adapter returns, including empty lists / `null` (fall back to defaults) — never skip empty results, or a reset leaves stale data on screen.
 
 ### Storage Adapters
 - `src/adapters/` contains a pluggable storage layer: `DatabaseAdapter` (abstract base), `LocalAdapter` (localStorage), `SupabaseAdapter` (cloud).
 - The active adapter is provided via `DatabaseContext` and consumed by all hooks via `useDatabaseContext()`.
 - The app defaults to `LocalAdapter` — Supabase is only activated when the user opts into cloud sync.
 - Swapping adapters (via `setAdapter` from `DatabaseContext`) causes all feature hooks to re-load their state from the new backend and start new realtime subscriptions.
+- Both adapters implement `saveActiveContraction(start|null)` / `getActiveContraction()` for the contraction currently being timed (`LocalAdapter`: `lc_active`; `SupabaseAdapter`: `activeContraction` in the settings blob). Cleared with the `contractions` category.
 - Both adapters implement `clearData(categories)` — accepts an array of category strings (`"contractions"`, `"hydration"`, `"todos"`, `"contacts"`, `"relief"`, `"appSettings"`, or `"all"`). Increments `resetKey` via `DatabaseContext.clearData()`.
 - Both adapters implement `destroySession()` — `LocalAdapter` delegates to `clearData(["all"])`; `SupabaseAdapter` deletes all snapshot rows and the session row, then nulls internal session state.
 - `SupabaseAdapter.saveSettings()` uses read-merge-write semantics — it reads the current cloud settings blob, merges the partial update, then writes back. This prevents multiple hooks writing different fields from overwriting each other.
@@ -145,14 +155,18 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Runtime values are managed by `useFeatureFlags` and provided via `FeatureFlagContext`.
 - Flags are persisted via `adapter.saveSettings({ flags: {...} })` — they live inside the settings blob (not a separate `luna_flags` key anymore).
 - The Settings modal surfaces a toggleable list of flags.
+- Current flags: `debugPopup` (off) and `cloudSync` (off — experimental; its toggle is hidden when Supabase env vars are missing).
 
 ### Debug Popup
 - `DebugContext` (in `src/context/DebugContext.jsx`) maintains a global error queue.
 - Any hook or adapter calls `pushError(message)` from `useDebug()` to add an error.
 - `DebugPopup` (`src/components/DebugPopup.jsx`) renders fixed-position dismissable cards, but only when the `debugPopup` feature flag is enabled.
 - Use this for non-fatal errors that should be surfaced to developers/testers without crashing the UI (e.g. cloud sync failures, unsync errors).
+- For failed saves use `useReportError()`: `adapter.saveX(...).catch(report("tasks"))` — never `catch {}`. `storage.set` throws on quota/blocked storage so these surface.
+- Render crashes are caught by `ErrorBoundary` (translated recovery screen, `errorBoundary.*` keys).
 
 ### Cloud Sync (Supabase)
+- **Ships dark** (see `docs/adr/0002-cloud-sync-ships-dark.md`): Sign in / Join only show when the `cloudSync` flag is on AND `isCloudConfigured()`. An already-synced device always shows its status and Unsync. The ADR lists the gaps (offline cache, partner write model, invite-code security, last-write-wins snapshots, realtime coverage) to close before defaulting it on.
 - Managed by `useCloudSync` — handles sign-in, session creation, partner invite flow, and unsync.
 - **signIn**: reads all local data via `LocalAdapter`, pushes it to Supabase (full settings blob included), clears local copies, swaps adapter to `SupabaseAdapter`. From this point all reads/writes go directly through the cloud adapter — there is no separate periodic sync step.
 - **joinAsPartner**: authenticates, joins an existing session by invite code, swaps adapter to `SupabaseAdapter`, subscribes to settings changes via `adapter.subscribeSettings()` so that if the primary switches mode, the partner UI updates in real time.
@@ -164,8 +178,8 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Cloud sync is entirely opt-in; removing Supabase credentials leaves the app fully functional via localStorage.
 
 ### Notifications
-- Managed by `useNotifications` — wraps the browser Notification API.
-- Used for water reminder alerts; fires when the hydration countdown expires if permission is granted.
+- Managed by `useNotifications`; delivery goes through `utils/notify.js` `showNotification()`, which uses `ServiceWorkerRegistration.showNotification` (required on Android Chrome and iOS PWAs) and falls back to `new Notification` on desktop. Icon: `/icons/icon-192.png`.
+- Used for water reminder alerts; fires when the hydration countdown expires if permission is granted. Foreground only — no push server; Settings tells the user. Title/body come from `t("notifications.*")` in `App.jsx`.
 - Enabled state persists to `luna_notif_water` (`"1"` / `"0"`).
 - Notification permission is requested lazily on first enable; a hint is shown in Settings if denied.
 
@@ -175,7 +189,8 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 
 | Key | Content |
 |-----|---------|
-| `lc_c4` | Contraction history array |
+| `lc_c4` | Contraction history array (full history, no cap) |
+| `lc_active` | Start timestamp of the contraction being timed (removed when it ends) |
 | `lc_m4` | Pain relief methods |
 | `lc_dc` | Drink count |
 | `lc_ld` | Last drink timestamp |
@@ -185,6 +200,7 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 | `luna_locale` | Language: `"en"` or `"uk"` |
 | `luna_due_date` | ISO date string |
 | `luna_countdown_unit` | Countdown display unit (`wks_days` / `days` / `hours`) |
+| `luna_contraction_rule` | Contraction rule: `5-1-1` / `4-1-1` / `3-1-1` (cleared with appSettings) |
 | `luna_todos` | Task list array |
 | `luna_flags` | Feature flags JSON object |
 | `luna_contacts` | Labour contacts array |
@@ -228,9 +244,12 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - Usage: `<Icon name="wave" size={24} color={N.accent} />`.
 - To add a new icon: add a case to the switch in `Icon.jsx` with the SVG path.
 
-### Phase Detection (Labour)
-- Computed in `src/utils/phaseAnalysis.js` via a majority-vote algorithm.
-- Requires at least 5 contractions to leave "tracking" phase.
+### Phase Detection & Contraction Rule (Labour)
+- Domain terms (contraction series, gap, phase, contraction rule) are defined in `GLOSSARY.md`.
+- Everything is judged on the **current contraction series** (`currentSeries`): contractions before a gap > 60 min are ignored.
+- Phase: majority vote over the last 6 contractions of the series; requires at least 4 to leave "tracking".
+- Contraction rule (`isRuleMet`, `docs/adr/0003`): last 10 contractions of the series average ≤ X min apart and ≥ 55 s long. X comes from the user's rule in Settings (default 5-1-1). Exposed as `stats.ruleMet`.
+- The contractions tab always shows a medical disclaimer footer with the active rule.
 - Phases: `tracking` → `early` → `active` → `transition`.
 - Phase configs (icons, colors, drink intervals) are in `src/constants/phases.js`.
 - Relief methods in `src/constants/methods.js` carry a `phases` array for sorting.
@@ -240,6 +259,7 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
 - **Expectation mode:** Expecting (countdown + todos) → Hydration → Relief
 - Tab switching is managed in `App.jsx`; the active component is rendered in the content area.
 - `MethodModal`, `SettingsModal`, and `ResetModal` render as overlays on top of tab content.
+- `UpdateBanner` renders under the tab bar when a new app version is waiting.
 - `DebugPopup` renders as a fixed-position overlay (bottom of screen) — always on top of everything.
 
 ### Data Reset
@@ -282,8 +302,8 @@ npm run test:coverage    # Coverage report (HTML + text, uses v8)
   group: "medical" | "shopping" | "admin" | "home" | "other"  // auto-assigned by todoSorter
 }
 
-// Phase Stats (computed, not persisted)
-{ avgDur: 45, avgGap: 5.2, trend: "intensifying" | "spacing out" | "stable", rule511: false }
+// Phase Stats (computed over the current contraction series, not persisted)
+{ avgDur: 45, avgGap: 5.2, trend: "intensifying" | "spacing out" | "stable", ruleMet: false }
 
 // Countdown result (from utils/countdown.js)
 { overdue: false, primary: 12, secondary: 3, labels: { primary: "weeks", secondary: "days" } }
@@ -313,7 +333,8 @@ Prefer TDD for all new code and refactoring. The goal is to catch bugs at the ea
 - Test observable behaviour (outputs, DOM state, hook return values), not implementation details.
 
 ### General Conventions
-- Test files live in `src/__tests__/` mirroring `src/` structure.
+- Test files live in `src/__tests__/` mirroring `src/` structure. Vitest only collects `src/**/*.test.{js,jsx}`; `tests/` holds Playwright screenshot specs (`npm run screenshots`).
+- CI (`.github/workflows/ci.yml`) runs `npm test` and `npm run build` on every PR and push to `main`.
 - Adapters: `src/__tests__/adapters/`, Hooks: `src/__tests__/hooks/`, Components: `src/__tests__/components/`, Context: `src/__tests__/context/`, Utils: `src/__tests__/utils/`.
 - `src/__tests__/setup.js` provides: localStorage mock, jest-dom matchers, Vitest globals.
 - Wrap components under test with `<LocaleContext>` when they use `useLocale()`.
@@ -321,14 +342,14 @@ Prefer TDD for all new code and refactoring. The goal is to catch bugs at the ea
 - Mock Supabase client when testing `useCloudSync` or `SupabaseAdapter`.
 - Vitest environment: `jsdom`. Coverage provider: `v8`.
 
-### Current Test Coverage (27 test files)
+### Current Test Coverage (33 test files)
 | Directory | Files |
 |-----------|-------|
 | `adapters/` | LocalAdapter |
-| `components/` | DueDateCountdown, Header, MediaDisplay, ModeToggle, SettingsModal, TaskModal, TodoCard |
+| `components/` | ContractionsTab, DueDateCountdown, ErrorBoundary, Header, MediaDisplay, ModeToggle, SettingsModal, TaskModal, TodoCard, UpdateBanner |
 | `context/` | FeatureFlagContext, LocaleContext |
-| `hooks/` | useAppMode, useCloudSync, useContractions, useDueDate, useFeatureFlags, useHydration, useLocale, useNotifications, useRelief, useTodos |
-| `utils/` | countdown, formatters, i18n, media, phaseAnalysis, todoSorter |
+| `hooks/` | saveErrors, useAppMode, useAppUpdate, useCloudSync, useContractionRule, useContractions, useDueDate, useFeatureFlags, useHydration, useLocale, useNotifications, useRelief, useTodos |
+| `utils/` | countdown, feedback, formatters, i18n, media, phaseAnalysis, todoSorter |
 
 ---
 
@@ -358,6 +379,8 @@ npm run build             # Output in dist/
 
 **Automated deployment:** The production app is deployed via Netlify with continuous deployment. Pushes to the `main` branch automatically trigger a new Netlify build and publish. No manual `dist/` upload is needed for production — just merge to `main`.
 
+Optional env var `VITE_FEEDBACK_EMAIL` (set in Netlify) enables the "Send feedback by email" mailto link in Settings; unset → hidden.
+
 HTTPS is required for iOS PWA installation and for the browser Notification API. Use Netlify/Vercel or the `--https` flag in `build-and-serve.sh` for local testing.
 
 ### App Versioning
@@ -365,8 +388,8 @@ HTTPS is required for iOS PWA installation and for the browser Notification API.
 - The app version is defined in `package.json` (`version` field).
 - Vite injects it as `__APP_VERSION__` at build time (via `define` in `vite.config.js`).
 - The version is displayed as a fixed badge at the bottom of every screen.
-- Users can check for PWA updates via the "Check for Updates" button in Settings → App Version.
-- The update check calls `ServiceWorkerRegistration.update()`. Because `registerType: "autoUpdate"` is set, any new service worker skips waiting and immediately takes control, triggering a page reload.
+- Updates are **prompt-based** (`registerType: "prompt"`, `docs/adr/0001-prompt-based-pwa-updates.md`): a new service worker installs and waits; `UpdateBanner` (and Settings → App Version) offer "Update now". Only then does `applyUpdate()` post `SKIP_WAITING`, and the page reloads on `controllerchange` only if the user asked. Never switch back to `autoUpdate` — a mid-labour reload is worse than an old version.
+- "Check for Updates" in Settings calls `ServiceWorkerRegistration.update()` and turns into "Update now" when a new version is waiting.
 
 #### Automated version bumping (CI)
 

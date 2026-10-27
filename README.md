@@ -2,16 +2,18 @@
 
 A mobile-first Progressive Web App (PWA) for tracking contractions, hydration, and pain relief techniques during labour. Runs entirely in the browser — no backend required. All data stays on your device by default; cloud sync and partner sharing are available optionally via Supabase.
 
+> **Not medical advice.** LunaBirth is a support tool. Always follow your midwife's or doctor's guidance.
+
 ## Features
 
-- **Contraction Tracker** — tap to start/stop, automatic 5-1-1 rule detection, labour phase analysis
-- **Hydration Reminders** — countdown ring timer, adaptive intervals based on labour phase
+- **Contraction Tracker** — tap to start/stop (survives reloads), configurable 5-1-1 / 4-1-1 / 3-1-1 rule alert, labour phase analysis, full history
+- **Hydration Reminders** — countdown ring timer, adaptive intervals based on labour phase; notifications fire only while the app is open
 - **Pain Relief Methods** — phase-sorted techniques with optional images, YouTube, or Spotify links
 - **Labour Phase Detection** — evidence-based majority-vote algorithm (tracking → early → active → transition)
 - **Affirmations** — rotating supportive messages throughout
 - **Expectation Mode** — due date countdown and task list for pre-labour preparation
 - **Bilingual** — English and Ukrainian (🇬🇧 / 🇺🇦)
-- **Cloud Sync & Partner Sharing** *(optional)* — real-time sync across devices via Supabase
+- **Cloud Sync & Partner Sharing** *(experimental, off by default)* — real-time sync via Supabase; enable the `cloudSync` feature flag in Settings (see [ADR 0002](docs/adr/0002-cloud-sync-ships-dark.md) for known gaps)
 
 ---
 
@@ -52,7 +54,8 @@ cp .env.example .env
 ```
 
 - **Local-only mode** (default): leave the `.env` values blank — all data stays in `localStorage`.
-- **Cloud sync mode**: fill in your Supabase credentials (see [Cloud Sync Setup](#cloud-sync--partner-sharing-optional) below).
+- **Cloud sync mode**: fill in your Supabase credentials (see [Cloud Sync Setup](#cloud-sync--partner-sharing-optional) below), then turn on the experimental `cloudSync` flag in Settings.
+- **Feedback link** *(optional)*: set `VITE_FEEDBACK_EMAIL` to show a "Send feedback by email" link in Settings.
 
 ### 5. Start the development server
 
@@ -202,7 +205,7 @@ src/
 │   ├── useRelief.js           # Pain relief methods CRUD + persistence
 │   ├── useTodos.js            # Expectation mode task list
 │   ├── useCloudSync.js        # Cloud sync orchestration
-│   ├── useNotifications.js    # Push notification scheduling
+│   ├── useNotifications.js    # Foreground water-reminder notifications
 │   └── useFeatureFlags.js     # Feature flag access hook
 ├── components/
 │   ├── Header.jsx             # App header with affirmation
