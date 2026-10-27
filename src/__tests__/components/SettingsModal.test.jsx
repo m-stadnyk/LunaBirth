@@ -34,6 +34,12 @@ vi.mock("../../context/LocaleContext.jsx", () => ({
   useLocaleContext: () => mockContext,
 }));
 
+let feedbackEmail = "";
+vi.mock("../../utils/feedback.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  getFeedbackEmail: () => feedbackEmail,
+}));
+
 let cloudConfigured = true;
 vi.mock("../../utils/cloudConfig.js", () => ({
   isCloudConfigured: () => cloudConfigured,
@@ -211,5 +217,21 @@ describe("SettingsModal — cloud sync gating", () => {
     mockFlagContext.flagDefs = [{ id: "cloudSync", labelKey: "flags.cloudSync" }];
     render(<SettingsModal open={true} onClose={() => {}} />);
     expect(screen.queryByText("flags.cloudSync")).not.toBeInTheDocument();
+  });
+});
+
+describe("SettingsModal — feedback", () => {
+  afterEach(() => { feedbackEmail = ""; });
+
+  it("hides the feedback link when no address is configured", () => {
+    render(<SettingsModal open={true} onClose={() => {}} />);
+    expect(screen.queryByText("settings.sendFeedback")).not.toBeInTheDocument();
+  });
+
+  it("shows a mailto feedback link when an address is configured", () => {
+    feedbackEmail = "hi@example.com";
+    render(<SettingsModal open={true} onClose={() => {}} />);
+    const link = screen.getByText("settings.sendFeedback").closest("a");
+    expect(link.getAttribute("href")).toMatch(/^mailto:hi@example\.com\?/);
   });
 });

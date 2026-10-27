@@ -150,7 +150,9 @@
     "contractionRuleLabel": "Правило перейм",
     "contractionRuleHint": "Оберіть правило, яке порадила ваша акушерка чи лікар. Воно визначає, коли LunaBirth запропонує зв'язатися з пологовою командою.",
     "contractionRuleOption": "{{rule}} · кожні {{minutes}} хв або частіше",
-    "waterNotifHint": "Нагадування з'являються лише тоді, коли LunaBirth відкрито на екрані."
+    "waterNotifHint": "Нагадування з'являються лише тоді, коли LunaBirth відкрито на екрані.",
+    "feedbackLabel": "Відгук",
+    "sendFeedback": "Надіслати відгук електронною поштою"
   },
   "reset": {
     "title": "Скидання даних",

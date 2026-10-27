@@ -4,6 +4,7 @@ import { useLocaleContext } from "../context/LocaleContext.jsx";
 import { useFeatureFlags } from "../context/FeatureFlagContext.jsx";
 import { CONTRACTION_RULES } from "../constants/contractionRules.js";
 import { isCloudConfigured } from "../utils/cloudConfig.js";
+import { getFeedbackEmail, buildFeedbackLink } from "../utils/feedback.js";
 
 function ToggleRow({ label, checked, onChange, disabled }) {
   return (
@@ -349,6 +350,7 @@ export function SettingsModal({
   // device always keeps its status and Unsync.
   const cloudConfigured = isCloudConfigured();
   const showCloud = cloudSync && (cloudSync.isSignedIn || (flags.cloudSync && cloudConfigured));
+  const feedbackLink = buildFeedbackLink(getFeedbackEmail(), { version: __APP_VERSION__, locale });
   const visibleFlags = flagDefs.filter(({ id }) => id !== "cloudSync" || cloudConfigured);
 
   return (
@@ -452,6 +454,23 @@ export function SettingsModal({
           <>
             <SectionDivider />
             <DataSection onOpenResetModal={onOpenResetModal} t={t} />
+          </>
+        )}
+
+        {feedbackLink && (
+          <>
+            <SectionDivider />
+            <SectionLabel>{t("settings.feedbackLabel")}</SectionLabel>
+            <a
+              href={feedbackLink}
+              style={{
+                display: "block", background: N.cream, border: `1px solid ${N.border}`,
+                borderRadius: 10, padding: "12px 16px", color: N.text,
+                fontSize: 15, textDecoration: "none",
+              }}
+            >
+              {t("settings.sendFeedback")}
+            </a>
           </>
         )}
 
