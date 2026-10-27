@@ -22,6 +22,7 @@ import { MethodModal } from "./components/MethodModal.jsx";
 import { SettingsModal } from "./components/SettingsModal.jsx";
 import { LabourContactsModal } from "./components/LabourContactsModal.jsx";
 import { DebugPopup } from "./components/DebugPopup.jsx";
+import { UpdateBanner } from "./components/UpdateBanner.jsx";
 import { ResetModal } from "./components/ResetModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
@@ -106,6 +107,7 @@ function AppInner() {
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <TabBar activeTab={tab} onTabChange={setTab} mode={mode} />
+        <UpdateBanner appUpdate={appUpdate} />
 
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 80px" }}>
 

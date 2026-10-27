@@ -26,6 +26,12 @@ export function useContractions({ onPhaseChange, rule } = {}) {
     adapter.getContractions().then((data) => {
       if (!cancelled) setContractions(data ?? []);
     });
+    // Restore a contraction that was being timed before a reload
+    adapter.getActiveContraction().then((start) => {
+      if (cancelled) return;
+      setActiveStart(start ?? null);
+      setElapsed(start ? Math.floor((Date.now() - start) / 1000) : 0);
+    }).catch(() => {});
     const unsub = adapter.subscribeContractions((data) => {
       setContractions(data);
     });
@@ -61,8 +67,10 @@ export function useContractions({ onPhaseChange, rule } = {}) {
 
   const handleContraction = async () => {
     if (!activeStart) {
-      setActiveStart(Date.now());
+      const start = Date.now();
+      setActiveStart(start);
       setElapsed(0);
+      adapter.saveActiveContraction(start).catch(() => {});
     } else {
       const duration = Math.floor((Date.now() - activeStart) / 1000);
       const entry = {
@@ -74,6 +82,7 @@ export function useContractions({ onPhaseChange, rule } = {}) {
       setContractions(updated);
       setActiveStart(null);
       setElapsed(0);
+      adapter.saveActiveContraction(null).catch(() => {});
       try {
         await adapter.saveContractions(updated);
       } catch {
@@ -89,6 +98,7 @@ export function useContractions({ onPhaseChange, rule } = {}) {
     setStats(null);
     prevPhaseRef.current = "tracking";
     setClearConfirm(false);
+    adapter.saveActiveContraction(null).catch(() => {});
     try {
       await adapter.saveContractions([]);
     } catch {

@@ -187,5 +187,11 @@
     "save": "Save",
     "cancel": "Cancel",
     "importBtn": "Import from phone contacts"
+  },
+  "update": {
+    "bannerText": "A new version of LunaBirth is ready.",
+    "bannerHint": "Update when you're not timing a contraction.",
+    "updateNow": "Update now",
+    "updating": "Updating…"
   }
 }

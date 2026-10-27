@@ -12,7 +12,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // Never auto-reload: a mid-labour reload is worse than an old version.
+      // See docs/adr/0001-prompt-based-pwa-updates.md
+      registerType: "prompt",
       includeAssets: ["icons/*.png", "icons/*.svg"],
       manifest: {
         name: "LunaBirth – Labor Companion",

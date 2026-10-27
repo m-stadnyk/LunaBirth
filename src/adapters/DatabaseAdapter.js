@@ -76,6 +76,20 @@ export class DatabaseAdapter {
   async getContractions() { throw new Error("Not implemented"); }
 
   /**
+   * Persist the start timestamp of the contraction currently being timed,
+   * or null when none is in progress. Survives reloads.
+   * @param {number|null} start
+   * @returns {Promise<void>}
+   */
+  async saveActiveContraction(start) { throw new Error("Not implemented"); } // eslint-disable-line no-unused-vars
+
+  /**
+   * Load the start timestamp of the in-progress contraction, or null.
+   * @returns {Promise<number|null>}
+   */
+  async getActiveContraction() { throw new Error("Not implemented"); }
+
+  /**
    * Subscribe to real-time contraction updates.
    * @param {function(Array): void} callback
    * @returns {function} Unsubscribe function — call to stop listening.

@@ -9,6 +9,8 @@ function createMockAdapter(overrides = {}) {
     getContractions: vi.fn(async () => []),
     saveContractions: vi.fn(async () => {}),
     subscribeContractions: vi.fn(() => () => {}),
+    getActiveContraction: vi.fn(async () => null),
+    saveActiveContraction: vi.fn(async () => {}),
     getTodos: vi.fn(async () => []),
     saveTodos: vi.fn(async () => {}),
     subscribeTodos: vi.fn(() => () => {}),
@@ -260,5 +262,38 @@ describe("useContractions — history", () => {
     await act(async () => { await result.current.handleContraction(); });
     expect(result.current.contractions).toHaveLength(31);
     expect(adapter.saveContractions.mock.lastCall[0]).toHaveLength(31);
+  });
+});
+
+describe("useContractions — in-progress contraction", () => {
+  it("persists the start when a contraction begins and clears it when it ends", async () => {
+    const adapter = createMockAdapter();
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.handleContraction(); });
+    const start = result.current.activeStart;
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(start);
+    await act(async () => { await result.current.handleContraction(); });
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(null);
+  });
+
+  it("restores an in-progress contraction after a reload", async () => {
+    const start = Date.now() - 20000;
+    const adapter = createMockAdapter({ getActiveContraction: vi.fn(async () => start) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    expect(result.current.activeStart).toBe(start);
+    await act(async () => { await result.current.handleContraction(); });
+    expect(result.current.contractions[0].start).toBe(start);
+    expect(result.current.contractions[0].duration).toBeGreaterThanOrEqual(20);
+  });
+
+  it("clearAll also clears the in-progress contraction", async () => {
+    const adapter = createMockAdapter({ getActiveContraction: vi.fn(async () => Date.now()) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.clearAll(); });
+    expect(result.current.activeStart).toBeNull();
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(null);
   });
 });

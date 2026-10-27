@@ -139,3 +139,21 @@ describe("LocalAdapter — contraction rule setting", () => {
     expect((await adapter.getSettings()).contractionRule).toBeNull();
   });
 });
+
+describe("LocalAdapter — in-progress contraction", () => {
+  it("round-trips the active contraction start and clears it with contractions", async () => {
+    const adapter = new LocalAdapter();
+    expect(await adapter.getActiveContraction()).toBeNull();
+    await adapter.saveActiveContraction(12345);
+    expect(await adapter.getActiveContraction()).toBe(12345);
+    await adapter.clearData(["contractions"]);
+    expect(await adapter.getActiveContraction()).toBeNull();
+  });
+
+  it("removes the active contraction when saved as null", async () => {
+    const adapter = new LocalAdapter();
+    await adapter.saveActiveContraction(12345);
+    await adapter.saveActiveContraction(null);
+    expect(await adapter.getActiveContraction()).toBeNull();
+  });
+});

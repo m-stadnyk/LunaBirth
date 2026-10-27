@@ -122,26 +122,56 @@ describe("useAppUpdate", () => {
       expect(result.current.status).toBe("upToDate");
     });
 
-    it("transitions to updating when a waiting SW is found", async () => {
+    it("reports an available update instead of applying it when a waiting SW is found", async () => {
       mockReg.waiting = { postMessage: vi.fn() };
-
       const { result } = renderHook(() => useAppUpdate());
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await act(async () => { await Promise.resolve(); });
 
       await act(async () => {
         result.current.checkForUpdates();
         await Promise.resolve();
       });
+      await act(async () => { vi.advanceTimersByTime(1500); });
 
-      await act(async () => {
-        vi.advanceTimersByTime(1500);
-      });
+      expect(result.current.updateAvailable).toBe(true);
+      expect(mockReg.waiting.postMessage).not.toHaveBeenCalled();
+    });
 
+    it("flags an update already waiting when the app opens", async () => {
+      mockReg.waiting = { postMessage: vi.fn() };
+      const { result } = renderHook(() => useAppUpdate());
+      await act(async () => { await Promise.resolve(); });
+      expect(result.current.updateAvailable).toBe(true);
+    });
+
+    it("applyUpdate tells the waiting SW to take over", async () => {
+      mockReg.waiting = { postMessage: vi.fn() };
+      const { result } = renderHook(() => useAppUpdate());
+      await act(async () => { await Promise.resolve(); });
+      act(() => result.current.applyUpdate());
       expect(result.current.status).toBe("updating");
       expect(mockReg.waiting.postMessage).toHaveBeenCalledWith({ type: "SKIP_WAITING" });
+    });
+
+    it("does not reload on controllerchange unless the user asked to update", async () => {
+      const reload = vi.fn();
+      const original = window.location;
+      Object.defineProperty(window, "location", { value: { reload }, configurable: true });
+      mockReg.waiting = { postMessage: vi.fn() };
+
+      const { result } = renderHook(() => useAppUpdate());
+      await act(async () => { await Promise.resolve(); });
+      const handler = navigator.serviceWorker.addEventListener.mock.calls
+        .find(([type]) => type === "controllerchange")[1];
+
+      handler();
+      expect(reload).not.toHaveBeenCalled();
+
+      act(() => result.current.applyUpdate());
+      handler();
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      Object.defineProperty(window, "location", { value: original, configurable: true });
     });
   });
 });

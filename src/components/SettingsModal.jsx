@@ -286,7 +286,7 @@ function DataSection({ onOpenResetModal, t }) {
 }
 
 function AppVersionSection({ appUpdate, t }) {
-  const { status, checkForUpdates } = appUpdate;
+  const { status, checkForUpdates, updateAvailable, applyUpdate } = appUpdate;
 
   const statusText = {
     checking: t("settings.updateChecking"),
@@ -307,7 +307,7 @@ function AppVersionSection({ appUpdate, t }) {
             v{__APP_VERSION__}
           </span>
           <button
-            onClick={checkForUpdates}
+            onClick={updateAvailable ? applyUpdate : checkForUpdates}
             disabled={status !== "idle"}
             style={{
               background: "none", border: `1px solid ${N.border}`,
@@ -317,7 +317,9 @@ function AppVersionSection({ appUpdate, t }) {
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            {status === "checking" ? t("settings.updateChecking") : t("settings.checkForUpdates")}
+            {status === "checking"
+              ? t("settings.updateChecking")
+              : updateAvailable ? t("update.updateNow") : t("settings.checkForUpdates")}
           </button>
         </div>
         {statusText && status !== "checking" && (

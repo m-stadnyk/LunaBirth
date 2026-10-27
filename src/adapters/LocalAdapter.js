@@ -3,6 +3,7 @@ import { storage } from "../utils/storage.js";
 
 const LS = {
   contractions: "lc_c4",
+  activeContraction: "lc_active",
   reliefMethods: "lc_m4",
   drinkCount: "lc_dc",
   lastDrank: "lc_ld",
@@ -52,6 +53,16 @@ export class LocalAdapter extends DatabaseAdapter {
 
   async getContractions() {
     return parseJSON(await storage.get(LS.contractions), []);
+  }
+
+  async saveActiveContraction(start) {
+    if (start) await storage.set(LS.activeContraction, String(start));
+    else await storage.remove(LS.activeContraction);
+  }
+
+  async getActiveContraction() {
+    const raw = await storage.get(LS.activeContraction);
+    return raw ? +raw.value || null : null;
   }
 
   subscribeContractions() { return () => {}; }
@@ -141,7 +152,9 @@ export class LocalAdapter extends DatabaseAdapter {
     const has = (cat) => categories.includes("all") || categories.includes(cat);
     const ops = [];
 
-    if (has("contractions")) ops.push(storage.remove(LS.contractions));
+    if (has("contractions")) {
+      ops.push(storage.remove(LS.contractions), storage.remove(LS.activeContraction));
+    }
 
     if (has("hydration")) {
       ops.push(

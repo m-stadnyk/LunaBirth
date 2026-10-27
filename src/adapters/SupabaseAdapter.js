@@ -152,6 +152,16 @@ export class SupabaseAdapter extends DatabaseAdapter {
     return data?.data ?? [];
   }
 
+  // The in-progress contraction lives in the settings blob so it needs no extra table.
+  async saveActiveContraction(start) {
+    await this.saveSettings({ activeContraction: start ?? null });
+  }
+
+  async getActiveContraction() {
+    const settings = await this.getSettings();
+    return settings?.activeContraction ?? null;
+  }
+
   subscribeContractions(callback) {
     let channel;
     this.#getClient().then((sb) => {
@@ -342,7 +352,7 @@ export class SupabaseAdapter extends DatabaseAdapter {
     }
 
     // Settings fields are cleared by removing specific keys from the JSON blob
-    if (has("relief") || has("appSettings")) {
+    if (has("relief") || has("appSettings") || has("contractions")) {
       ops.push(
         (async () => {
           const { data } = await sb
@@ -353,6 +363,7 @@ export class SupabaseAdapter extends DatabaseAdapter {
 
           const current = { ...(data?.settings ?? {}) };
           if (has("relief")) delete current.reliefMethods;
+          if (has("contractions")) delete current.activeContraction;
           if (has("appSettings")) {
             delete current.mode;
             delete current.dueDate;
