@@ -66,6 +66,9 @@ function NotificationsSection({ notifications, t }) {
           onChange={() => notifications.toggle()}
           disabled={isDenied}
         />
+        <p style={{ margin: "4px 0 0", color: N.muted, fontSize: 12, paddingLeft: 4 }}>
+          {t("settings.waterNotifHint")}
+        </p>
         {isDenied && (
           <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
             {t("settings.notifDeniedHint")}

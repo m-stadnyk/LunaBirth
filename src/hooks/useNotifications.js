@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../utils/storage.js";
+import { showNotification } from "../utils/notify.js";
 
 const KEY = "luna_notif_water";
 
 /**
  * Manages browser Notification permission and user preference for water reminders.
- * Fires in-app notifications only while the browser has the app loaded.
- * No server-side push or VAPID keys required.
+ * Reminders fire only while the app is open (foreground timers); there is no
+ * server-side push. Settings tells the user this.
  */
 export function useNotifications() {
   const [permission, setPermission] = useState(
@@ -53,19 +54,12 @@ export function useNotifications() {
    * No-op if disabled, permission not granted, or Notification API unavailable.
    */
   const notifyWater = useCallback((title, body) => {
-    if (!enabled || typeof Notification === "undefined") return;
-    if (Notification.permission !== "granted") return;
-
-    try {
-      new Notification(title ?? "Time to drink! 💧", {
-        body: body ?? "Your water reminder interval has ended.",
-        icon: "/icons/icon-192x192.png",
-        tag: "luna-water", // replaces previous notification instead of stacking
-        renotify: true,
-      });
-    } catch {
-      // Notification constructor can throw in some browser contexts — silently ignore
-    }
+    if (!enabled) return Promise.resolve();
+    return showNotification(title ?? "Time to drink! 💧", {
+      body: body ?? "Your water reminder interval has ended.",
+      tag: "luna-water", // replaces previous notification instead of stacking
+      renotify: true,
+    });
   }, [enabled]);
 
   return { permission, enabled, toggle, notifyWater };

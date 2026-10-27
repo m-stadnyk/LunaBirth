@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { N } from "./theme/index.js";
+import { showNotification } from "./utils/notify.js";
 import { useAppMode } from "./hooks/useAppMode.js";
 import { useDueDate } from "./hooks/useDueDate.js";
 import { useTodos } from "./hooks/useTodos.js";
@@ -63,17 +64,18 @@ function AppInner() {
   const cloudSync = useCloudSync({
     onRemoteModeChange: (newMode) => {
       setMode(newMode);
-      if (newMode === "labour" && typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification(t("notifications.labourStarted.title"), {
+      if (newMode === "labour") {
+        showNotification(t("notifications.labourStarted.title"), {
           body: t("notifications.labourStarted.body"),
-          icon: "/icons/icon-192x192.png",
           tag: "luna-mode",
           renotify: true,
         });
       }
     },
   });
-  const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
+  const hydration = useHydration({
+    onDrinkAlert: () => notifications.notifyWater(t("notifications.waterTitle"), t("notifications.waterBody")),
+  });
   const contractionRule = useContractionRule();
   const contractions = useContractions({
     onPhaseChange: hydration.handlePhaseChange,

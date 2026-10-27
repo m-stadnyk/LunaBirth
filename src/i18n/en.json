@@ -149,7 +149,8 @@
     "updateAvailable": "Update found — reloading…",
     "contractionRuleLabel": "Contraction rule",
     "contractionRuleHint": "Choose the rule your midwife or doctor advised. It sets when LunaBirth suggests contacting your birth team.",
-    "contractionRuleOption": "{{rule}} · {{minutes}} min apart or closer"
+    "contractionRuleOption": "{{rule}} · {{minutes}} min apart or closer",
+    "waterNotifHint": "Reminders only appear while LunaBirth is open on screen."
   },
   "reset": {
     "title": "Reset Data",
