@@ -16,7 +16,7 @@ export function useTodos() {
   useEffect(() => {
     let cancelled = false;
     adapter.getTodos().then((data) => {
-      if (!cancelled && data?.length) setTodosRaw(sortTodos(data));
+      if (!cancelled) setTodosRaw(sortTodos(data ?? []));
     });
     const unsub = adapter.subscribeTodos((data) => {
       if (!cancelled) setTodosRaw(sortTodos(data));

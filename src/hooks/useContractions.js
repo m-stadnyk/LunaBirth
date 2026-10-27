@@ -23,7 +23,7 @@ export function useContractions({ onPhaseChange } = {}) {
   useEffect(() => {
     let cancelled = false;
     adapter.getContractions().then((data) => {
-      if (!cancelled && data?.length) setContractions(data);
+      if (!cancelled) setContractions(data ?? []);
     });
     const unsub = adapter.subscribeContractions((data) => {
       setContractions(data);

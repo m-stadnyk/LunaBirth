@@ -227,3 +227,23 @@ describe("useContractions", () => {
     expect(result.current.contractions.length).toBeLessThanOrEqual(30);
   });
 });
+
+describe("useContractions — data reset", () => {
+  it("clears contractions from state when a reset reloads an empty list", async () => {
+    const adapter = createMockAdapter({
+      getContractions: vi.fn(async () => [{ start: 1000, duration: 30, time: "10:00" }]),
+    });
+    let ctx = { adapter, setAdapter: vi.fn(), resetKey: 0 };
+    const wrapper = ({ children }) =>
+      React.createElement(DatabaseContext.Provider, { value: ctx }, children);
+    const { result, rerender } = renderHook(() => useContractions(), { wrapper });
+    await act(async () => {});
+    expect(result.current.contractions).toHaveLength(1);
+
+    adapter.getContractions.mockResolvedValue([]);
+    ctx = { ...ctx, resetKey: 1 };
+    rerender();
+    await act(async () => {});
+    expect(result.current.contractions).toHaveLength(0);
+  });
+});
