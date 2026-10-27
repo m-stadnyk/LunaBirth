@@ -76,6 +76,8 @@ export default defineConfig({
   ],
   test: {
     environment: "jsdom",
+    // Unit tests only; tests/ holds Playwright screenshot specs (npm run screenshots)
+    include: ["src/**/*.test.{js,jsx}"],
     setupFiles: ["./src/__tests__/setup.js"],
     globals: true,
     coverage: {
