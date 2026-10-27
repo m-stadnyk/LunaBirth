@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { sortTodos } from "../utils/todoSorter.js";
 
 /**
@@ -9,6 +10,7 @@ import { sortTodos } from "../utils/todoSorter.js";
  */
 export function useTodos() {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [todos, setTodosRaw] = useState([]);
 
   // Load todos and subscribe to real-time updates.
@@ -30,7 +32,7 @@ export function useTodos() {
   const setTodos = (next) => {
     const sorted = sortTodos(next);
     setTodosRaw(sorted);
-    adapter.saveTodos(sorted).catch(() => {});
+    adapter.saveTodos(sorted).catch(report("tasks"));
   };
 
   const addTodo = (text) => {

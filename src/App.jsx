@@ -24,6 +24,7 @@ import { SettingsModal } from "./components/SettingsModal.jsx";
 import { LabourContactsModal } from "./components/LabourContactsModal.jsx";
 import { DebugPopup } from "./components/DebugPopup.jsx";
 import { UpdateBanner } from "./components/UpdateBanner.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import { ResetModal } from "./components/ResetModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
@@ -229,18 +230,21 @@ function AppInner() {
 /**
  * Provider order: DatabaseProvider is outermost so all inner contexts
  * (LocaleProvider, FeatureFlagProvider) can use the active adapter for persistence.
- * DebugProvider must wrap AppInner so hooks inside AppInner can call useDebug().
+ * DebugProvider sits just inside it so every persisting hook — including the
+ * locale and flag providers — can report save failures.
  */
 export default function App() {
   return (
     <DatabaseProvider>
-      <LocaleProvider>
-        <FeatureFlagProvider>
-          <DebugProvider>
-            <AppInner />
-          </DebugProvider>
-        </FeatureFlagProvider>
-      </LocaleProvider>
+      <DebugProvider>
+        <LocaleProvider>
+          <FeatureFlagProvider>
+            <ErrorBoundary>
+              <AppInner />
+            </ErrorBoundary>
+          </FeatureFlagProvider>
+        </LocaleProvider>
+      </DebugProvider>
     </DatabaseProvider>
   );
 }

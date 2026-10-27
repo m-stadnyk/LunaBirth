@@ -46,7 +46,7 @@ export function useNotifications() {
     }
 
     setEnabled(next);
-    storage.set(KEY, next ? "1" : "0");
+    storage.set(KEY, next ? "1" : "0").catch(() => {}); // preference only; best-effort
   }, [enabled]);
 
   /**

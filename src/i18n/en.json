@@ -195,5 +195,10 @@
     "bannerHint": "Update when you're not timing a contraction.",
     "updateNow": "Update now",
     "updating": "Updating…"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "body": "Your data is saved on this device. Reload to continue — if this keeps happening, please send feedback from Settings.",
+    "reload": "Reload"
   }
 }

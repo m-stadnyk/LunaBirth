@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { computePhase, computeStats } from "../utils/phaseAnalysis.js";
 import { PHASES } from "../constants/index.js";
 
@@ -11,6 +12,7 @@ import { PHASES } from "../constants/index.js";
  */
 export function useContractions({ onPhaseChange, rule } = {}) {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [contractions, setContractions] = useState([]);
   const [activeStart, setActiveStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
@@ -70,7 +72,7 @@ export function useContractions({ onPhaseChange, rule } = {}) {
       const start = Date.now();
       setActiveStart(start);
       setElapsed(0);
-      adapter.saveActiveContraction(start).catch(() => {});
+      adapter.saveActiveContraction(start).catch(report("active contraction"));
     } else {
       const duration = Math.floor((Date.now() - activeStart) / 1000);
       const entry = {
@@ -82,11 +84,11 @@ export function useContractions({ onPhaseChange, rule } = {}) {
       setContractions(updated);
       setActiveStart(null);
       setElapsed(0);
-      adapter.saveActiveContraction(null).catch(() => {});
+      adapter.saveActiveContraction(null).catch(report("active contraction"));
       try {
         await adapter.saveContractions(updated);
-      } catch {
-        // ignore
+      } catch (err) {
+        report("contractions")(err);
       }
     }
   };
@@ -98,11 +100,11 @@ export function useContractions({ onPhaseChange, rule } = {}) {
     setStats(null);
     prevPhaseRef.current = "tracking";
     setClearConfirm(false);
-    adapter.saveActiveContraction(null).catch(() => {});
+    adapter.saveActiveContraction(null).catch(report("active contraction"));
     try {
       await adapter.saveContractions([]);
-    } catch {
-      // ignore
+    } catch (err) {
+      report("contractions")(err);
     }
   };
 

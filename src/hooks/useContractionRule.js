@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { CONTRACTION_RULES, DEFAULT_RULE } from "../constants/contractionRules.js";
 
 /**
@@ -8,6 +9,7 @@ import { CONTRACTION_RULES, DEFAULT_RULE } from "../constants/contractionRules.j
  */
 export function useContractionRule() {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [rule, setRuleState] = useState(DEFAULT_RULE);
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export function useContractionRule() {
   const setRule = (next) => {
     if (!CONTRACTION_RULES[next]) return;
     setRuleState(next);
-    adapter.saveSettings({ contractionRule: next }).catch(() => {});
+    adapter.saveSettings({ contractionRule: next }).catch(report("contraction rule"));
   };
 
   return { rule, setRule, rules: Object.keys(CONTRACTION_RULES) };

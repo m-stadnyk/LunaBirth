@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { DEFAULT_METHODS } from "../constants/index.js";
 
 /**
@@ -9,6 +10,7 @@ import { DEFAULT_METHODS } from "../constants/index.js";
  */
 export function useRelief() {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [methods, setMethods] = useState(DEFAULT_METHODS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
@@ -44,8 +46,8 @@ export function useRelief() {
     setShowAddForm(false);
     try {
       await adapter.saveSettings({ reliefMethods: updated });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("pain relief methods")(err);
     }
   };
 
@@ -55,8 +57,8 @@ export function useRelief() {
     if (activeMethod?.id === id) setActiveMethod(null);
     try {
       await adapter.saveSettings({ reliefMethods: updated });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("pain relief methods")(err);
     }
   };
 
@@ -66,8 +68,8 @@ export function useRelief() {
     setActiveMethod((prev) => (prev?.id === id ? { ...prev, mediaUrl } : prev));
     try {
       await adapter.saveSettings({ reliefMethods: updated });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("pain relief methods")(err);
     }
   };
 

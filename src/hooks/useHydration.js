@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { PHASES } from "../constants/index.js";
 
 const HYDRATION_DEFAULTS = { drinkCount: 0, drinkInterval: 15, intervals: [5, 15, 30] };
@@ -13,6 +14,7 @@ const HYDRATION_DEFAULTS = { drinkCount: 0, drinkInterval: 15, intervals: [5, 15
  */
 export function useHydration({ onDrinkAlert } = {}) {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [drinkInterval, setDrinkInterval] = useState(15);
   const drinkIntervalRef = useRef(15);
   const [intervals, setIntervals] = useState([5, 15, 30]);
@@ -90,8 +92,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: v,
         intervals: intervalsRef.current,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -112,8 +114,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: v,
         intervals: updated,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -138,8 +140,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: newInterval,
         intervals: updated,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -159,8 +161,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: drinkIntervalRef.current,
         intervals: intervalsRef.current,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
