@@ -177,7 +177,8 @@
     }
   },
   "flags": {
-    "debugPopup": "Debug error popup"
+    "debugPopup": "Debug error popup",
+    "cloudSync": "Cloud sync & partner (experimental)"
   },
   "contacts": {
     "title": "Labour Contacts",

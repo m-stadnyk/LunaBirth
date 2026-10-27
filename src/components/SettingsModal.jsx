@@ -3,6 +3,7 @@ import { N } from "../theme/index.js";
 import { useLocaleContext } from "../context/LocaleContext.jsx";
 import { useFeatureFlags } from "../context/FeatureFlagContext.jsx";
 import { CONTRACTION_RULES } from "../constants/contractionRules.js";
+import { isCloudConfigured } from "../utils/cloudConfig.js";
 
 function ToggleRow({ label, checked, onChange, disabled }) {
   return (
@@ -343,6 +344,13 @@ export function SettingsModal({
 
   if (!open) return null;
 
+  // Cloud sync ships dark (docs/adr/0002-cloud-sync-ships-dark.md): sign-in is
+  // offered only with the flag on and Supabase configured; an already-synced
+  // device always keeps its status and Unsync.
+  const cloudConfigured = isCloudConfigured();
+  const showCloud = cloudSync && (cloudSync.isSignedIn || (flags.cloudSync && cloudConfigured));
+  const visibleFlags = flagDefs.filter(({ id }) => id !== "cloudSync" || cloudConfigured);
+
   return (
     <div
       onClick={onClose}
@@ -414,7 +422,7 @@ export function SettingsModal({
           </>
         )}
 
-        {cloudSync && (
+        {showCloud && (
           <>
             <SectionDivider />
             <CloudSyncSection cloudSync={cloudSync} t={t} />
@@ -424,11 +432,11 @@ export function SettingsModal({
         {/* Feature flags */}
         <SectionDivider />
         <SectionLabel>{t("settings.featuresLabel")}</SectionLabel>
-        {flagDefs.length === 0 ? (
+        {visibleFlags.length === 0 ? (
           <p style={{ margin: 0, color: N.muted, fontSize: 13 }}>{t("settings.noFlags")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {flagDefs.map(({ id, labelKey }) => (
+            {visibleFlags.map(({ id, labelKey }) => (
               <ToggleRow
                 key={id}
                 label={t(labelKey)}

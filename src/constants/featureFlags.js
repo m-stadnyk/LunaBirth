@@ -14,4 +14,7 @@
  */
 export const FEATURE_FLAGS = [
   { id: "debugPopup", labelKey: "flags.debugPopup", defaultValue: false },
+  // Cloud sync & partner mode — off until the gaps in docs/adr/0002 are closed.
+  // The toggle is hidden when Supabase env vars are missing.
+  { id: "cloudSync", labelKey: "flags.cloudSync", defaultValue: false },
 ];
