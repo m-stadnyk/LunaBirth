@@ -2,6 +2,7 @@ import { useState } from "react";
 import { N } from "../theme/index.js";
 import { useLocaleContext } from "../context/LocaleContext.jsx";
 import { useFeatureFlags } from "../context/FeatureFlagContext.jsx";
+import { CONTRACTION_RULES } from "../constants/contractionRules.js";
 
 function ToggleRow({ label, checked, onChange, disabled }) {
   return (
@@ -225,6 +226,41 @@ function CloudSyncSection({ cloudSync, t }) {
   );
 }
 
+function ContractionRuleSection({ contractionRule, t }) {
+  return (
+    <>
+      <SectionLabel>{t("settings.contractionRuleLabel")}</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {contractionRule.rules.map((id) => {
+          const active = id === contractionRule.rule;
+          return (
+            <button
+              key={id}
+              data-rule={id}
+              aria-pressed={active}
+              onClick={() => contractionRule.setRule(id)}
+              style={{
+                textAlign: "left",
+                background: active ? N.goldLight : N.cream,
+                border: `1px solid ${active ? N.gold : N.border}`,
+                borderRadius: 10, padding: "12px 16px",
+                color: active ? N.gold : N.text,
+                fontSize: 15, cursor: "pointer",
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {t("settings.contractionRuleOption", { rule: id, minutes: CONTRACTION_RULES[id].maxGapMin })}
+            </button>
+          );
+        })}
+        <p style={{ margin: "4px 0 0", color: N.muted, fontSize: 12, paddingLeft: 4 }}>
+          {t("settings.contractionRuleHint")}
+        </p>
+      </div>
+    </>
+  );
+}
+
 function DataSection({ onOpenResetModal, t }) {
   return (
     <>
@@ -294,7 +330,9 @@ function AppVersionSection({ appUpdate, t }) {
   );
 }
 
-export function SettingsModal({ open, onClose, notifications, cloudSync, appUpdate, onOpenResetModal }) {
+export function SettingsModal({
+  open, onClose, notifications, cloudSync, appUpdate, onOpenResetModal, contractionRule,
+}) {
   const { locale, setLocale, t, supportedLocales } = useLocaleContext();
   const { flags, setFlag, flagDefs } = useFeatureFlags();
 
@@ -356,6 +394,13 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
             </button>
           ))}
         </div>
+
+        {contractionRule && (
+          <>
+            <SectionDivider />
+            <ContractionRuleSection contractionRule={contractionRule} t={t} />
+          </>
+        )}
 
         {notifications && (
           <>

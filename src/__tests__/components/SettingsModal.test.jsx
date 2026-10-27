@@ -148,3 +148,22 @@ describe("SettingsModal", () => {
     expect(mockSetFlag).toHaveBeenCalledWith("alpha", false);
   });
 });
+
+describe("SettingsModal — contraction rule", () => {
+  const contractionRule = { rule: "5-1-1", setRule: vi.fn(), rules: ["5-1-1", "4-1-1", "3-1-1"] };
+
+  it("renders one option per rule with the active one pressed", () => {
+    render(<SettingsModal open={true} onClose={() => {}} contractionRule={contractionRule} />);
+    const options = screen.getAllByRole("button", { pressed: false }).concat(screen.getAllByRole("button", { pressed: true }))
+      .filter((b) => b.dataset.rule);
+    expect(options.map((b) => b.dataset.rule).sort()).toEqual(["3-1-1", "4-1-1", "5-1-1"]);
+    expect(screen.getByRole("button", { pressed: true }).dataset.rule).toBe("5-1-1");
+  });
+
+  it("calls setRule when another rule is picked", async () => {
+    render(<SettingsModal open={true} onClose={() => {}} contractionRule={contractionRule} />);
+    const btn = screen.getAllByRole("button").find((b) => b.dataset.rule === "4-1-1");
+    await userEvent.click(btn);
+    expect(contractionRule.setRule).toHaveBeenCalledWith("4-1-1");
+  });
+});

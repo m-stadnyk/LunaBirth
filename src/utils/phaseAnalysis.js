@@ -1,11 +1,44 @@
 import { PHASES } from "../constants/index.js";
+import {
+  CONTRACTION_RULES,
+  DEFAULT_RULE,
+  RULE_WINDOW,
+  RULE_MIN_AVG_DURATION,
+  SERIES_BREAK_MIN,
+} from "../constants/contractionRules.js";
+
+const gapMin = (newer, older) => (newer.start - older.start) / 60000;
+const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+/**
+ * The current contraction series: the newest-first run of contractions up to
+ * (not including) the first gap longer than SERIES_BREAK_MIN minutes.
+ */
+export function currentSeries(contractions) {
+  const series = [];
+  for (let i = 0; i < contractions.length; i++) {
+    if (i > 0 && gapMin(contractions[i - 1], contractions[i]) > SERIES_BREAK_MIN) break;
+    series.push(contractions[i]);
+  }
+  return series;
+}
+
+/** Whether the given contraction rule (e.g. "5-1-1") is met by the current series. */
+export function isRuleMet(contractions, ruleId = DEFAULT_RULE) {
+  const rule = CONTRACTION_RULES[ruleId] ?? CONTRACTION_RULES[DEFAULT_RULE];
+  const recent = currentSeries(contractions).slice(0, RULE_WINDOW);
+  if (recent.length < RULE_WINDOW) return false;
+  const gaps = recent.slice(0, -1).map((c, i) => gapMin(c, recent[i + 1]));
+  return avg(gaps) <= rule.maxGapMin && avg(recent.map((c) => c.duration)) >= RULE_MIN_AVG_DURATION;
+}
 
 /**
  * Phase detection with majority-vote stability.
- * Uses the last 5 contraction PAIRS and only returns a phase
+ * Uses the last 5 contraction PAIRS of the current series and only returns a phase
  * when it's the majority — prevents flicker on individual outliers.
  */
-export function computePhase(contractions) {
+export function computePhase(allContractions) {
+  const contractions = currentSeries(allContractions);
   if (contractions.length < 4) return "tracking";
   const n = Math.min(6, contractions.length);
   const counts = {};
@@ -24,7 +57,8 @@ export function computePhase(contractions) {
   return sorted[0][1] >= threshold ? sorted[0][0] : "tracking";
 }
 
-export function computeStats(contractions) {
+export function computeStats(allContractions, ruleId = DEFAULT_RULE) {
+  const contractions = currentSeries(allContractions);
   if (contractions.length < 2) return null;
   const n = Math.min(6, contractions.length);
   const recent = contractions.slice(0, n);
@@ -44,9 +78,7 @@ export function computeStats(contractions) {
     else if (newAvg > oldAvg + 0.7) trend = "spacing out";
   }
 
-  // 5-1-1 rule: ~5 min apart, ~1 min long, for 6+ contractions
-  const rule511 = contractions.length >= 6 && avgGap >= 4.5 && avgGap <= 5.5 && avgDur >= 55;
-  return { avgDur, avgGap, trend, rule511 };
+  return { avgDur, avgGap, trend, ruleMet: isRuleMet(contractions, ruleId) };
 }
 
 /** Sort methods so those relevant to the current phase appear first. */

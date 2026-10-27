@@ -8,6 +8,7 @@ import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
 import { useLabourContacts } from "./hooks/useLabourContacts.js";
+import { useContractionRule } from "./hooks/useContractionRule.js";
 import { useNotifications } from "./hooks/useNotifications.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { useAppUpdate } from "./hooks/useAppUpdate.js";
@@ -72,7 +73,11 @@ function AppInner() {
     },
   });
   const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
-  const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
+  const contractionRule = useContractionRule();
+  const contractions = useContractions({
+    onPhaseChange: hydration.handlePhaseChange,
+    rule: contractionRule.rule,
+  });
   const relief = useRelief();
   const labourContacts = useLabourContacts();
   const todos = useTodos();
@@ -130,6 +135,7 @@ function AppInner() {
               setClearConfirm={contractions.setClearConfirm}
               phase={contractions.phase}
               stats={contractions.stats}
+              rule={contractionRule.rule}
               handleContraction={contractions.handleContraction}
               clearAll={contractions.clearAll}
             />
@@ -188,6 +194,7 @@ function AppInner() {
           notifications={notifications}
           cloudSync={cloudSync}
           appUpdate={appUpdate}
+          contractionRule={contractionRule}
           onOpenResetModal={() => { setSettingsOpen(false); setResetOpen(true); }}
         />
 

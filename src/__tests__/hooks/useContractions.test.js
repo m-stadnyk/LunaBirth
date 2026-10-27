@@ -247,3 +247,24 @@ describe("useContractions — data reset", () => {
     expect(result.current.contractions).toHaveLength(0);
   });
 });
+
+describe("useContractions — contraction rule", () => {
+  const tenAt = (gapMin) => {
+    const now = Date.now();
+    return Array.from({ length: 10 }, (_, i) => ({ start: now - i * gapMin * 60000, duration: 60, time: "x" }));
+  };
+
+  it("evaluates the rule passed in", async () => {
+    const adapter = createMockAdapter({ getContractions: vi.fn(async () => tenAt(5)) });
+    const { result, rerender } = renderHook(({ rule }) => useContractions({ rule }), {
+      wrapper: makeWrapper(adapter),
+      initialProps: { rule: "5-1-1" },
+    });
+    await act(async () => {});
+    expect(result.current.stats.ruleMet).toBe(true);
+
+    rerender({ rule: "4-1-1" });
+    await act(async () => {});
+    expect(result.current.stats.ruleMet).toBe(false);
+  });
+});

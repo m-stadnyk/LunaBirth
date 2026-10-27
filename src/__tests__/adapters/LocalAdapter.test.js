@@ -7,6 +7,7 @@ vi.mock("../../utils/storage.js", () => {
     storage: {
       get: vi.fn(async (key) => store[key] != null ? { value: store[key] } : null),
       set: vi.fn(async (key, value) => { store[key] = String(value); }),
+      remove: vi.fn(async (key) => { delete store[key]; }),
       _store: store, // expose for test inspection
     },
   };
@@ -126,5 +127,15 @@ describe("LocalAdapter", () => {
     const s = await adapter.getSettings();
     expect(s.mode).toBe("labour");
     expect(s.locale).toBeNull();
+  });
+});
+
+describe("LocalAdapter — contraction rule setting", () => {
+  it("round-trips contractionRule and clears it with appSettings", async () => {
+    const adapter = new LocalAdapter();
+    await adapter.saveSettings({ contractionRule: "4-1-1" });
+    expect((await adapter.getSettings()).contractionRule).toBe("4-1-1");
+    await adapter.clearData(["appSettings"]);
+    expect((await adapter.getSettings()).contractionRule).toBeNull();
   });
 });

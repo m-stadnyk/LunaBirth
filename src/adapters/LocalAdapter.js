@@ -15,6 +15,7 @@ const LS = {
   todos: "luna_todos",
   flags: "luna_flags",
   contacts: "luna_contacts",
+  contractionRule: "luna_contraction_rule",
 };
 
 function parseJSON(raw, fallback) {
@@ -99,7 +100,7 @@ export class LocalAdapter extends DatabaseAdapter {
    * Partial-write: only the keys present in partialSettings are updated.
    * Existing keys not mentioned are untouched (each has its own localStorage entry).
    */
-  async saveSettings({ mode, locale, dueDate, countdownUnit, reliefMethods, flags } = {}) {
+  async saveSettings({ mode, locale, dueDate, countdownUnit, reliefMethods, flags, contractionRule } = {}) {
     const ops = [];
     if (mode !== undefined) ops.push(storage.set(LS.mode, mode));
     if (locale !== undefined) ops.push(storage.set(LS.locale, locale));
@@ -109,17 +110,19 @@ export class LocalAdapter extends DatabaseAdapter {
     if (countdownUnit !== undefined) ops.push(storage.set(LS.countdownUnit, countdownUnit));
     if (reliefMethods !== undefined) ops.push(storage.set(LS.reliefMethods, JSON.stringify(reliefMethods)));
     if (flags !== undefined) ops.push(storage.set(LS.flags, JSON.stringify(flags)));
+    if (contractionRule !== undefined) ops.push(storage.set(LS.contractionRule, contractionRule));
     await Promise.all(ops);
   }
 
   async getSettings() {
-    const [mode, locale, dueDate, countdownUnit, reliefMethods, flags] = await Promise.all([
+    const [mode, locale, dueDate, countdownUnit, reliefMethods, flags, contractionRule] = await Promise.all([
       storage.get(LS.mode),
       storage.get(LS.locale),
       storage.get(LS.dueDate),
       storage.get(LS.countdownUnit),
       storage.get(LS.reliefMethods),
       storage.get(LS.flags),
+      storage.get(LS.contractionRule),
     ]);
     return {
       mode: mode?.value || null,
@@ -128,6 +131,7 @@ export class LocalAdapter extends DatabaseAdapter {
       countdownUnit: countdownUnit?.value || null,
       reliefMethods: parseJSON(reliefMethods, null),
       flags: parseJSON(flags, null),
+      contractionRule: contractionRule?.value || null,
     };
   }
 
@@ -157,6 +161,7 @@ export class LocalAdapter extends DatabaseAdapter {
         storage.remove(LS.mode),
         storage.remove(LS.dueDate),
         storage.remove(LS.countdownUnit),
+        storage.remove(LS.contractionRule),
       );
     }
 

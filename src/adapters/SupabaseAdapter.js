@@ -357,6 +357,7 @@ export class SupabaseAdapter extends DatabaseAdapter {
             delete current.mode;
             delete current.dueDate;
             delete current.countdownUnit;
+            delete current.contractionRule;
           }
 
           await sb.from("sessions").update({ settings: current }).eq("id", this.#sessionId);

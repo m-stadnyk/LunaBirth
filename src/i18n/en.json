@@ -28,8 +28,12 @@
     "gap": "Gap",
     "intensifying": "^ intensifying",
     "spacingOut": "v spacing out",
-    "rule511Title": "5-1-1 Rule Reached",
-    "rule511Body": "Contractions ~5 min apart, ~1 min long, sustained. Most providers recommend heading to your birth location now. Call your midwife or OB."
+    "ruleTitle": "{{rule}} rule reached",
+    "ruleBody": "Your last 10 contractions are on average {{minutes}} min apart or closer and about a minute long. If this matches what your provider advised, contact your midwife or birth team now.",
+    "ruleFooter": "Rule: {{rule}} · change in Settings",
+    "disclaimer": "LunaBirth is a support tool, not medical advice. Follow your midwife's or doctor's guidance and get help right away if something feels wrong.",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "hydration": {
     "untilNextSip": "until next sip",
@@ -142,7 +146,10 @@
     "checkForUpdates": "Check for Updates",
     "updateChecking": "Checking…",
     "updateUpToDate": "You're up to date",
-    "updateAvailable": "Update found — reloading…"
+    "updateAvailable": "Update found — reloading…",
+    "contractionRuleLabel": "Contraction rule",
+    "contractionRuleHint": "Choose the rule your midwife or doctor advised. It sets when LunaBirth suggests contacting your birth team.",
+    "contractionRuleOption": "{{rule}} · {{minutes}} min apart or closer"
   },
   "reset": {
     "title": "Reset Data",

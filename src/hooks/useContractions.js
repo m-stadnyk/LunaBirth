@@ -7,8 +7,9 @@ import { PHASES } from "../constants/index.js";
  * Manages contraction tracking state, timers, phase detection, and persistence.
  *
  * @param {function} onPhaseChange - Called with (newPhase, suggestedDrinkMin) when phase changes.
+ * @param {string} rule - Contraction rule id ("5-1-1" | "4-1-1" | "3-1-1") used for stats.ruleMet.
  */
-export function useContractions({ onPhaseChange } = {}) {
+export function useContractions({ onPhaseChange, rule } = {}) {
   const { adapter, resetKey } = useDatabaseContext();
   const [contractions, setContractions] = useState([]);
   const [activeStart, setActiveStart] = useState(null);
@@ -47,7 +48,7 @@ export function useContractions({ onPhaseChange } = {}) {
   // Recompute phase and stats whenever the contraction list changes
   useEffect(() => {
     const newPhase = computePhase(contractions);
-    const newStats = computeStats(contractions);
+    const newStats = computeStats(contractions, rule);
     setPhase(newPhase);
     setStats(newStats);
 
@@ -56,7 +57,7 @@ export function useContractions({ onPhaseChange } = {}) {
       prevPhaseRef.current = newPhase;
       onPhaseChange?.(newPhase, PHASES[newPhase].drinkMin);
     }
-  }, [contractions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [contractions, rule]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleContraction = async () => {
     if (!activeStart) {
