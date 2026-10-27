@@ -399,7 +399,7 @@ Project skills live in `.claude/skills/` (vendored from [mattpocock/skills](http
 | `grilling` | `/grilling` or model-invoked | Round-based design-tree interview with recommended answers. **Customised:** each round is asked via the `AskUserQuestion` tool (tappable multiple choice, recommended option first, ≤4 per call) for mobile use; falls back to the markdown format |
 | `domain-modeling` | `/domain-modeling` or model-invoked | Sharpens terminology; writes `GLOSSARY.md` (repo root) and ADRs in `docs/adr/` lazily |
 
-`GLOSSARY.md` and `docs/adr/` do not exist yet — they're created the first time a term is resolved or an ADR is needed.
+Domain terms live in `GLOSSARY.md` (repo root); architectural decisions in `docs/adr/` (0001 prompt-based PWA updates, 0002 cloud sync ships dark, 0003 count-based contraction rule).
 
 ---
 
