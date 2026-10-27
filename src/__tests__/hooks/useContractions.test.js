@@ -206,26 +206,6 @@ describe("useContractions", () => {
     });
     expect(onPhaseChange).not.toThrow;
   });
-
-  it("caps contraction history at 30 entries", async () => {
-    const { result } = renderHook(() => useContractions(), {
-      wrapper: makeWrapper(adapter),
-    });
-    await act(async () => {});
-
-    for (let i = 0; i < 31; i++) {
-      await act(async () => {
-        await result.current.handleContraction();
-      });
-      vi.setSystemTime(new Date(Date.now() + 30000));
-      await act(async () => {
-        await result.current.handleContraction();
-      });
-      vi.setSystemTime(new Date(Date.now() + 300000));
-    }
-
-    expect(result.current.contractions.length).toBeLessThanOrEqual(30);
-  });
 });
 
 describe("useContractions — data reset", () => {
@@ -266,5 +246,19 @@ describe("useContractions — contraction rule", () => {
     rerender({ rule: "4-1-1" });
     await act(async () => {});
     expect(result.current.stats.ruleMet).toBe(false);
+  });
+});
+
+describe("useContractions — history", () => {
+  it("keeps every contraction (no 30-entry cap)", async () => {
+    const now = Date.now();
+    const stored = Array.from({ length: 30 }, (_, i) => ({ start: now - (i + 1) * 300000, duration: 40, time: "x" }));
+    const adapter = createMockAdapter({ getContractions: vi.fn(async () => stored) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.handleContraction(); });
+    await act(async () => { await result.current.handleContraction(); });
+    expect(result.current.contractions).toHaveLength(31);
+    expect(adapter.saveContractions.mock.lastCall[0]).toHaveLength(31);
   });
 });

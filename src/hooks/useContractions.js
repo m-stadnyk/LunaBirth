@@ -70,7 +70,7 @@ export function useContractions({ onPhaseChange, rule } = {}) {
         duration,
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      const updated = [entry, ...contractions].slice(0, 30);
+      const updated = [entry, ...contractions];
       setContractions(updated);
       setActiveStart(null);
       setElapsed(0);
