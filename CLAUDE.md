@@ -391,15 +391,18 @@ Use `npm version <patch|minor|major> --no-git-tag-version` before opening a PR w
 
 ## Claude Code Skills
 
-Project skills live in `.claude/skills/` (vendored from [mattpocock/skills](https://github.com/mattpocock/skills), MIT — see `.claude/skills/LICENSE-mattpocock-skills`):
+Project skills live in `.claude/skills/`. Most are vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT — see `.claude/skills/LICENSE-mattpocock-skills`); `ub-mode` is vendored from [unclebob/ub-mode](https://github.com/unclebob/ub-mode) (see `.claude/skills/ub-mode/SOURCE.md` for the pinned commit):
 
 | Skill | Invocation | Purpose |
 |-------|-----------|---------|
 | `grill-with-docs` | `/grill-with-docs` (user-only) | Interview session that stress-tests a plan; loads `grilling` + `domain-modeling` |
 | `grilling` | `/grilling` or model-invoked | Round-based design-tree interview with recommended answers. **Customised:** each round is asked via the `AskUserQuestion` tool (tappable multiple choice, recommended option first, ≤4 per call) for mobile use; falls back to the markdown format |
 | `domain-modeling` | `/domain-modeling` or model-invoked | Sharpens terminology; writes `GLOSSARY.md` (repo root) and ADRs in `docs/adr/` lazily |
+| `ub-mode` | `/ub-mode` or model-invoked | Uncle Bob's engineering discipline for code changes: Make it Work (TDD, domain modelling, boundaries) → Make it Right (root causes, refactoring, CRAP/duplication/mutation gates) → Practice (action log, small commits) |
 
 `GLOSSARY.md` and `docs/adr/` do not exist yet — they're created the first time a term is resolved or an ADR is needed.
+
+**`ub-mode` notes for this repo:** its quality-gate tools ([crapper](https://github.com/unclebob/crapper), [dryer](https://github.com/unclebob/dryer), [mutator](https://github.com/unclebob/mutator)) are not installed here — skip those steps unless they are added. Its "push to the main line" step does not override branch rules: push to the working branch and merge via PR (merging to `main` deploys to production).
 
 ---
 
