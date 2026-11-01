@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "screenshots": "playwright test"
+    "screenshots": "playwright test",
+    "quality:install": "./scripts/install-ub-tools.sh",
+    "quality:crap": ".tools/ub/.venv/bin/crapper src",
+    "quality:dry": ".tools/ub/.venv/bin/dryer src",
+    "quality:mutate": ".tools/ub/.venv/bin/mutator"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

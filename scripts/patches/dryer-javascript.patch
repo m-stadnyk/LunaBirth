@@ -1,0 +1,39 @@
+diff --git a/src/dryer/discover.py b/src/dryer/discover.py
+index 6feeaa7..d4f3425 100644
+--- a/src/dryer/discover.py
++++ b/src/dryer/discover.py
+@@ -19,6 +19,10 @@ EXTENSIONS = {
+     ".tsx": "typescript",
+     ".mts": "typescript",
+     ".cts": "typescript",
++    ".js": "typescript",
++    ".jsx": "typescript",
++    ".mjs": "typescript",
++    ".cjs": "typescript",
+     ".rs": "rust",
+     ".py": "python",
+ }
+@@ -71,6 +75,10 @@ def is_test_file(path: str | Path) -> bool:
+             ".spec.mts",
+             ".test.cts",
+             ".spec.cts",
++            ".test.js",
++            ".spec.js",
++            ".test.jsx",
++            ".spec.jsx",
+         )
+     ):
+         return True
+diff --git a/src/dryer/extract.py b/src/dryer/extract.py
+index 51f3160..294925a 100644
+--- a/src/dryer/extract.py
++++ b/src/dryer/extract.py
+@@ -29,7 +29,7 @@ _DEFINITION_PARENTS = {
+ 
+ 
+ def _grammar(path: str) -> str:
+-    if path.endswith(".tsx"):
++    if path.endswith((".tsx", ".jsx", ".js", ".mjs", ".cjs")):
+         return "tsx"
+     return "typescript"
+ 

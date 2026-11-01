@@ -109,6 +109,13 @@ npm run test:watch       # Tests in watch mode
 npm run test:ui          # Browser test UI
 npm run test:coverage    # Coverage report (HTML + text, uses v8)
 
+# ub-mode quality gates (Python >=3.11; run quality:install once per machine/session)
+npm run quality:install              # Clone + install crapper/dryer/mutator into .tools/ub
+npm run quality:crap                 # CRAP score per function (runs Vitest coverage) — keep < 10
+npm run quality:crap -- --changed    # Only git-changed files
+npm run quality:dry                  # Structural duplicates — eliminate score >= 0.8
+npm run quality:mutate -- src/utils/formatters.js   # Mutation-test one file (start small!)
+
 # Build + serve over LAN (for testing PWA on mobile)
 ./scripts/build-and-serve.sh
 ./scripts/build-and-serve.sh --https   # Required for iOS PWA install
@@ -320,6 +327,7 @@ Prefer TDD for all new code and refactoring. The goal is to catch bugs at the ea
 - Mock `src/utils/storage.js` for hook tests that touch persistence.
 - Mock Supabase client when testing `useCloudSync` or `SupabaseAdapter`.
 - Vitest environment: `jsdom`. Coverage provider: `v8`.
+- Vitest only collects `src/**/*.test.{js,jsx}` (set in `vite.config.js`). `tests/screenshots/` holds Playwright specs, run via `npm run screenshots` — keep them out of Vitest.
 
 ### Current Test Coverage (27 test files)
 | Directory | Files |
@@ -402,7 +410,12 @@ Project skills live in `.claude/skills/`. Most are vendored from [mattpocock/ski
 
 `GLOSSARY.md` and `docs/adr/` do not exist yet — they're created the first time a term is resolved or an ADR is needed.
 
-**`ub-mode` notes for this repo:** its quality-gate tools ([crapper](https://github.com/unclebob/crapper), [dryer](https://github.com/unclebob/dryer), [mutator](https://github.com/unclebob/mutator)) are not installed here — skip those steps unless they are added. Its "push to the main line" step does not override branch rules: push to the working branch and merge via PR (merging to `main` deploys to production).
+**`ub-mode` notes for this repo:**
+- Its quality-gate tools — [crapper](https://github.com/unclebob/crapper), [dryer](https://github.com/unclebob/dryer), [mutator](https://github.com/unclebob/mutator) (0BSD, Python CLIs) — are installed by `scripts/install-ub-tools.sh` (`npm run quality:install`) at pinned commits into `.tools/ub/` with one shared venv. `.tools/` is gitignored, so cloud sessions must re-run the installer. Bump the pins in that script to update.
+- `scripts/patches/<tool>-*.patch` are applied on top of each pin. `dryer-javascript.patch` adds `.js`/`.jsx` support (upstream dryer only reads `.ts`/`.tsx`; crapper and mutator already handle JS). Drop it once upstream supports JS.
+- Tool output goes to `.metrics/` (CRAP/dup/mutation snapshots) and `target/` (coverage, mutation workers); both gitignored. Mutator reruns differentially from its `.metrics/mutate/` snapshot.
+- Mutator needs the baseline `npm test` to pass, and runs the full suite for each mutant — target one file or `--changed`, not all of `src/`.
+- Its "push to the main line" step does not override branch rules: push to the working branch and merge via PR (merging to `main` deploys to production).
 
 ---
 

@@ -5,3 +5,8 @@ dist/
 coverage/
 playwright-results/
 playwright-report/
+
+# ub-mode quality-gate tools (scripts/install-ub-tools.sh) and their output
+.tools/
+.metrics/
+target/
