@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { N } from "../../theme/index.js";
-import { PHASES } from "../../constants/index.js";
+import { PHASES, CONTRACTION_RULES } from "../../constants/index.js";
 import { fmtSec, fmtMMSS } from "../../utils/formatters.js";
 import { Icon } from "../../components/Icon.jsx";
 import { useLocaleContext } from "../../context/LocaleContext.jsx";
+
+const RECENT_COUNT = 8;
 
 export function ContractionsTab({
   contractions,
@@ -12,11 +15,14 @@ export function ContractionsTab({
   setClearConfirm,
   phase,
   stats,
+  rule,
   handleContraction,
   clearAll,
 }) {
   const cfg = PHASES[phase];
   const { t } = useLocaleContext();
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? contractions : contractions.slice(0, RECENT_COUNT);
 
   return (
     <>
@@ -103,8 +109,8 @@ export function ContractionsTab({
         </div>
       )}
 
-      {/* 5-1-1 alert */}
-      {stats?.rule511 && (
+      {/* Contraction rule alert */}
+      {stats?.ruleMet && (
         <div
           style={{
             background: "rgba(224,117,117,0.12)",
@@ -127,10 +133,10 @@ export function ContractionsTab({
                 marginBottom: 4,
               }}
             >
-              {t("contractions.rule511Title")}
+              {t("contractions.ruleTitle", { rule })}
             </div>
             <p style={{ margin: 0, fontSize: 13, color: N.muted, lineHeight: 1.5 }}>
-              {t("contractions.rule511Body")}
+              {t("contractions.ruleBody", { minutes: CONTRACTION_RULES[rule]?.maxGapMin })}
             </p>
           </div>
         </div>
@@ -299,7 +305,7 @@ export function ContractionsTab({
               </button>
             )}
           </div>
-          {contractions.slice(0, 8).map((c, i) => (
+          {visible.map((c, i) => (
             <div
               key={c.start}
               style={{
@@ -307,7 +313,7 @@ export function ContractionsTab({
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "9px 0",
-                borderBottom: i < 7 ? `1px solid ${N.border}` : "none",
+                borderBottom: i < visible.length - 1 ? `1px solid ${N.border}` : "none",
               }}
             >
               <span style={{ fontSize: 13, color: N.muted }}>{c.time}</span>
@@ -330,8 +336,26 @@ export function ContractionsTab({
               )}
             </div>
           ))}
+          {contractions.length > RECENT_COUNT && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              style={{
+                width: "100%", marginTop: 8, background: "none",
+                border: `1px solid ${N.border}`, color: N.muted,
+                borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer",
+              }}
+            >
+              {showAll ? t("contractions.showLess") : t("contractions.showMore")}
+            </button>
+          )}
         </div>
       )}
+
+      {/* Medical disclaimer + active rule */}
+      <div style={{ marginTop: 18, textAlign: "center", fontSize: 11, color: N.muted, lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 4px" }}>{t("contractions.disclaimer")}</p>
+        <p style={{ margin: 0, opacity: 0.8 }}>{t("contractions.ruleFooter", { rule })}</p>
+      </div>
     </>
   );
 }

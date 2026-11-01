@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { FEATURE_FLAGS } from "../constants/featureFlags.js";
 
 export function buildDefaults() {
@@ -8,6 +9,7 @@ export function buildDefaults() {
 
 export function useFeatureFlagsState() {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [flags, setFlags] = useState(buildDefaults);
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export function useFeatureFlagsState() {
   const setFlag = (id, value) => {
     setFlags((prev) => {
       const next = { ...prev, [id]: value };
-      adapter.saveSettings({ flags: next }).catch(() => {});
+      adapter.saveSettings({ flags: next }).catch(report("feature flags"));
       return next;
     });
   };

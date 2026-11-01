@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { PHASES } from "../constants/index.js";
+
+const HYDRATION_DEFAULTS = { drinkCount: 0, drinkInterval: 15, intervals: [5, 15, 30] };
 
 /**
  * Manages hydration reminders: countdown timer, drink logging, interval management,
@@ -11,6 +14,7 @@ import { PHASES } from "../constants/index.js";
  */
 export function useHydration({ onDrinkAlert } = {}) {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [drinkInterval, setDrinkInterval] = useState(15);
   const drinkIntervalRef = useRef(15);
   const [intervals, setIntervals] = useState([5, 15, 30]);
@@ -31,24 +35,18 @@ export function useHydration({ onDrinkAlert } = {}) {
   // Re-runs when adapter changes (e.g. partner joins and adapter swaps to Supabase).
   useEffect(() => {
     let cancelled = false;
-    adapter.getHydration().then((data) => {
+    adapter.getHydration().then((stored) => {
       if (cancelled) return;
-      if (data.drinkCount !== undefined) {
-        setDrinkCount(data.drinkCount);
-        drinkCountRef.current = data.drinkCount;
-      }
-      if (data.lastDrank !== undefined) {
-        setLastDrank(data.lastDrank);
-        lastDrankRef.current = data.lastDrank;
-      }
-      if (data.drinkInterval !== undefined) {
-        setDrinkInterval(data.drinkInterval);
-        drinkIntervalRef.current = data.drinkInterval;
-      }
-      if (data.intervals !== undefined) {
-        setIntervals(data.intervals);
-        intervalsRef.current = data.intervals;
-      }
+      // A missing record (e.g. cloud row deleted by a reset) falls back to defaults
+      const data = { ...HYDRATION_DEFAULTS, lastDrank: Date.now(), ...(stored ?? {}) };
+      setDrinkCount(data.drinkCount);
+      drinkCountRef.current = data.drinkCount;
+      setLastDrank(data.lastDrank);
+      lastDrankRef.current = data.lastDrank;
+      setDrinkInterval(data.drinkInterval);
+      drinkIntervalRef.current = data.drinkInterval;
+      setIntervals(data.intervals);
+      intervalsRef.current = data.intervals;
     });
     return () => { cancelled = true; };
   }, [adapter, resetKey]);
@@ -94,8 +92,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: v,
         intervals: intervalsRef.current,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -116,8 +114,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: v,
         intervals: updated,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -142,8 +140,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: newInterval,
         intervals: updated,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 
@@ -163,8 +161,8 @@ export function useHydration({ onDrinkAlert } = {}) {
         drinkInterval: drinkIntervalRef.current,
         intervals: intervalsRef.current,
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      report("hydration")(err);
     }
   };
 

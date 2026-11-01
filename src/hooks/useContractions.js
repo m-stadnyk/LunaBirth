@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 import { computePhase, computeStats } from "../utils/phaseAnalysis.js";
 import { PHASES } from "../constants/index.js";
 
@@ -7,9 +8,11 @@ import { PHASES } from "../constants/index.js";
  * Manages contraction tracking state, timers, phase detection, and persistence.
  *
  * @param {function} onPhaseChange - Called with (newPhase, suggestedDrinkMin) when phase changes.
+ * @param {string} rule - Contraction rule id ("5-1-1" | "4-1-1" | "3-1-1") used for stats.ruleMet.
  */
-export function useContractions({ onPhaseChange } = {}) {
+export function useContractions({ onPhaseChange, rule } = {}) {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [contractions, setContractions] = useState([]);
   const [activeStart, setActiveStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
@@ -23,8 +26,14 @@ export function useContractions({ onPhaseChange } = {}) {
   useEffect(() => {
     let cancelled = false;
     adapter.getContractions().then((data) => {
-      if (!cancelled && data?.length) setContractions(data);
+      if (!cancelled) setContractions(data ?? []);
     });
+    // Restore a contraction that was being timed before a reload
+    adapter.getActiveContraction().then((start) => {
+      if (cancelled) return;
+      setActiveStart(start ?? null);
+      setElapsed(start ? Math.floor((Date.now() - start) / 1000) : 0);
+    }).catch(() => {});
     const unsub = adapter.subscribeContractions((data) => {
       setContractions(data);
     });
@@ -47,7 +56,7 @@ export function useContractions({ onPhaseChange } = {}) {
   // Recompute phase and stats whenever the contraction list changes
   useEffect(() => {
     const newPhase = computePhase(contractions);
-    const newStats = computeStats(contractions);
+    const newStats = computeStats(contractions, rule);
     setPhase(newPhase);
     setStats(newStats);
 
@@ -56,12 +65,14 @@ export function useContractions({ onPhaseChange } = {}) {
       prevPhaseRef.current = newPhase;
       onPhaseChange?.(newPhase, PHASES[newPhase].drinkMin);
     }
-  }, [contractions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [contractions, rule]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleContraction = async () => {
     if (!activeStart) {
-      setActiveStart(Date.now());
+      const start = Date.now();
+      setActiveStart(start);
       setElapsed(0);
+      adapter.saveActiveContraction(start).catch(report("active contraction"));
     } else {
       const duration = Math.floor((Date.now() - activeStart) / 1000);
       const entry = {
@@ -69,14 +80,15 @@ export function useContractions({ onPhaseChange } = {}) {
         duration,
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      const updated = [entry, ...contractions].slice(0, 30);
+      const updated = [entry, ...contractions];
       setContractions(updated);
       setActiveStart(null);
       setElapsed(0);
+      adapter.saveActiveContraction(null).catch(report("active contraction"));
       try {
         await adapter.saveContractions(updated);
-      } catch {
-        // ignore
+      } catch (err) {
+        report("contractions")(err);
       }
     }
   };
@@ -88,10 +100,11 @@ export function useContractions({ onPhaseChange } = {}) {
     setStats(null);
     prevPhaseRef.current = "tracking";
     setClearConfirm(false);
+    adapter.saveActiveContraction(null).catch(report("active contraction"));
     try {
       await adapter.saveContractions([]);
-    } catch {
-      // ignore
+    } catch (err) {
+      report("contractions")(err);
     }
   };
 

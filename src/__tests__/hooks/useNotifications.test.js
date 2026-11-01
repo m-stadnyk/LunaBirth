@@ -91,7 +91,7 @@ describe("useNotifications", () => {
     const { result } = renderHook(() => useNotifications());
 
     await act(async () => { await result.current.toggle(); });
-    act(() => { result.current.notifyWater("Title", "Body"); });
+    await act(async () => { await result.current.notifyWater("Title", "Body"); });
 
     expect(NotifMock).toHaveBeenCalledWith("Title", expect.objectContaining({ body: "Body" }));
   });
@@ -101,7 +101,7 @@ describe("useNotifications", () => {
     const { result } = renderHook(() => useNotifications());
     // Do not toggle — remains disabled
 
-    act(() => { result.current.notifyWater("Title", "Body"); });
+    await act(async () => { await result.current.notifyWater("Title", "Body"); });
 
     expect(NotifMock).not.toHaveBeenCalled();
   });
@@ -110,7 +110,7 @@ describe("useNotifications", () => {
     const NotifMock = mockNotification({ permission: "denied" });
     const { result } = renderHook(() => useNotifications());
 
-    act(() => { result.current.notifyWater("Title", "Body"); });
+    await act(async () => { await result.current.notifyWater("Title", "Body"); });
 
     expect(NotifMock).not.toHaveBeenCalled();
   });
@@ -128,11 +128,34 @@ describe("useNotifications", () => {
     const { result } = renderHook(() => useNotifications());
 
     await act(async () => { await result.current.toggle(); });
-    act(() => { result.current.notifyWater(); });
+    await act(async () => { await result.current.notifyWater(); });
 
     expect(NotifMock).toHaveBeenCalledWith(
       "Time to drink! 💧",
       expect.objectContaining({ body: "Your water reminder interval has ended." })
     );
+  });
+
+  it("notifyWater: uses the existing app icon", async () => {
+    const NotifMock = mockNotification({ permission: "granted" });
+    const { result } = renderHook(() => useNotifications());
+    await act(async () => { await result.current.toggle(); });
+    await act(async () => { await result.current.notifyWater("T", "B"); });
+    expect(NotifMock).toHaveBeenCalledWith("T", expect.objectContaining({ icon: "/icons/icon-192.png" }));
+  });
+
+  it("notifyWater: prefers the service worker registration (required on Android/iOS)", async () => {
+    const NotifMock = mockNotification({ permission: "granted" });
+    const showNotification = vi.fn(async () => {});
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: { getRegistration: vi.fn(async () => ({ showNotification })) },
+      configurable: true,
+    });
+    const { result } = renderHook(() => useNotifications());
+    await act(async () => { await result.current.toggle(); });
+    await act(async () => { await result.current.notifyWater("T", "B"); });
+    expect(showNotification).toHaveBeenCalledWith("T", expect.objectContaining({ body: "B" }));
+    expect(NotifMock).not.toHaveBeenCalled();
+    Object.defineProperty(navigator, "serviceWorker", { value: undefined, configurable: true });
   });
 });

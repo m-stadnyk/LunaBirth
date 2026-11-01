@@ -9,6 +9,8 @@ function createMockAdapter(overrides = {}) {
     getContractions: vi.fn(async () => []),
     saveContractions: vi.fn(async () => {}),
     subscribeContractions: vi.fn(() => () => {}),
+    getActiveContraction: vi.fn(async () => null),
+    saveActiveContraction: vi.fn(async () => {}),
     getTodos: vi.fn(async () => []),
     saveTodos: vi.fn(async () => {}),
     subscribeTodos: vi.fn(() => () => {}),
@@ -206,24 +208,92 @@ describe("useContractions", () => {
     });
     expect(onPhaseChange).not.toThrow;
   });
+});
 
-  it("caps contraction history at 30 entries", async () => {
-    const { result } = renderHook(() => useContractions(), {
+describe("useContractions — data reset", () => {
+  it("clears contractions from state when a reset reloads an empty list", async () => {
+    const adapter = createMockAdapter({
+      getContractions: vi.fn(async () => [{ start: 1000, duration: 30, time: "10:00" }]),
+    });
+    let ctx = { adapter, setAdapter: vi.fn(), resetKey: 0 };
+    const wrapper = ({ children }) =>
+      React.createElement(DatabaseContext.Provider, { value: ctx }, children);
+    const { result, rerender } = renderHook(() => useContractions(), { wrapper });
+    await act(async () => {});
+    expect(result.current.contractions).toHaveLength(1);
+
+    adapter.getContractions.mockResolvedValue([]);
+    ctx = { ...ctx, resetKey: 1 };
+    rerender();
+    await act(async () => {});
+    expect(result.current.contractions).toHaveLength(0);
+  });
+});
+
+describe("useContractions — contraction rule", () => {
+  const tenAt = (gapMin) => {
+    const now = Date.now();
+    return Array.from({ length: 10 }, (_, i) => ({ start: now - i * gapMin * 60000, duration: 60, time: "x" }));
+  };
+
+  it("evaluates the rule passed in", async () => {
+    const adapter = createMockAdapter({ getContractions: vi.fn(async () => tenAt(5)) });
+    const { result, rerender } = renderHook(({ rule }) => useContractions({ rule }), {
       wrapper: makeWrapper(adapter),
+      initialProps: { rule: "5-1-1" },
     });
     await act(async () => {});
+    expect(result.current.stats.ruleMet).toBe(true);
 
-    for (let i = 0; i < 31; i++) {
-      await act(async () => {
-        await result.current.handleContraction();
-      });
-      vi.setSystemTime(new Date(Date.now() + 30000));
-      await act(async () => {
-        await result.current.handleContraction();
-      });
-      vi.setSystemTime(new Date(Date.now() + 300000));
-    }
+    rerender({ rule: "4-1-1" });
+    await act(async () => {});
+    expect(result.current.stats.ruleMet).toBe(false);
+  });
+});
 
-    expect(result.current.contractions.length).toBeLessThanOrEqual(30);
+describe("useContractions — history", () => {
+  it("keeps every contraction (no 30-entry cap)", async () => {
+    const now = Date.now();
+    const stored = Array.from({ length: 30 }, (_, i) => ({ start: now - (i + 1) * 300000, duration: 40, time: "x" }));
+    const adapter = createMockAdapter({ getContractions: vi.fn(async () => stored) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.handleContraction(); });
+    await act(async () => { await result.current.handleContraction(); });
+    expect(result.current.contractions).toHaveLength(31);
+    expect(adapter.saveContractions.mock.lastCall[0]).toHaveLength(31);
+  });
+});
+
+describe("useContractions — in-progress contraction", () => {
+  it("persists the start when a contraction begins and clears it when it ends", async () => {
+    const adapter = createMockAdapter();
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.handleContraction(); });
+    const start = result.current.activeStart;
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(start);
+    await act(async () => { await result.current.handleContraction(); });
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(null);
+  });
+
+  it("restores an in-progress contraction after a reload", async () => {
+    const start = Date.now() - 20000;
+    const adapter = createMockAdapter({ getActiveContraction: vi.fn(async () => start) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    expect(result.current.activeStart).toBe(start);
+    await act(async () => { await result.current.handleContraction(); });
+    expect(result.current.contractions[0].start).toBe(start);
+    expect(result.current.contractions[0].duration).toBeGreaterThanOrEqual(20);
+  });
+
+  it("clearAll also clears the in-progress contraction", async () => {
+    const adapter = createMockAdapter({ getActiveContraction: vi.fn(async () => Date.now()) });
+    const { result } = renderHook(() => useContractions(), { wrapper: makeWrapper(adapter) });
+    await act(async () => {});
+    await act(async () => { await result.current.clearAll(); });
+    expect(result.current.activeStart).toBeNull();
+    expect(adapter.saveActiveContraction).toHaveBeenLastCalledWith(null);
   });
 });

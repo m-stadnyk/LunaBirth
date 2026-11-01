@@ -32,3 +32,15 @@ export function DebugProvider({ children }) {
 export function useDebug() {
   return useContext(DebugContext);
 }
+
+/**
+ * Returns report(label) → an error handler that pushes "Could not save <label>"
+ * to the debug queue. Use for persistence failures that keep the optimistic UI.
+ */
+export function useReportError() {
+  const { pushError } = useDebug();
+  return useCallback(
+    (label) => (err) => pushError(`Could not save ${label}: ${err?.message ?? err}`),
+    [pushError]
+  );
+}

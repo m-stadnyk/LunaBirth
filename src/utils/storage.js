@@ -12,12 +12,9 @@ export const storage = {
       return null;
     }
   },
+  // Throws on quota exceeded / storage blocked so callers can surface the failure
   set: async (key, value) => {
-    try {
-      localStorage.setItem(key, String(value));
-    } catch {
-      // Storage quota exceeded or private browsing — silently ignore
-    }
+    localStorage.setItem(key, String(value));
   },
   remove: async (key) => {
     try {

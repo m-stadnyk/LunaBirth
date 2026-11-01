@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useDatabaseContext } from "../context/DatabaseContext.jsx";
+import { useReportError } from "../context/DebugContext.jsx";
 
 export function useLabourContacts() {
   const { adapter, resetKey } = useDatabaseContext();
+  const report = useReportError();
   const [contacts, setContacts] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNickname, setNewNickname] = useState("");
@@ -30,8 +32,8 @@ export function useLabourContacts() {
     setShowAddForm(false);
     try {
       await adapter.saveContacts(updated);
-    } catch {
-      // ignore — optimistic update stands
+    } catch (err) {
+      report("contacts")(err); // optimistic update stands
     }
   };
 
@@ -40,8 +42,8 @@ export function useLabourContacts() {
     setContacts(updated);
     try {
       await adapter.saveContacts(updated);
-    } catch {
-      // ignore
+    } catch (err) {
+      report("contacts")(err);
     }
   };
 

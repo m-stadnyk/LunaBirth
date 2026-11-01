@@ -1,0 +1,3 @@
+# Count-based contraction rule
+
+The contraction rule (5-1-1 / 4-1-1 / 3-1-1, chosen in Settings) is met when the last 10 contractions of the current contraction series average at most X minutes apart and at least ~1 minute long. Clinically, these rules mean "sustained for one hour". We chose a count-based window because it is simpler to compute and explain, and at a 5-minute gap 10 contractions cover roughly 50 minutes. Contractions before a gap longer than 60 minutes start a new series and are ignored, so an earlier false alarm can't trigger the rule. The app is not medical advice, and a disclaimer is shown on the contractions tab.

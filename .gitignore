@@ -5,3 +5,4 @@ dist/
 coverage/
 playwright-results/
 playwright-report/
+.idea/

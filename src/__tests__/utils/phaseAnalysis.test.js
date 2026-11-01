@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computePhase, computeStats, sortByPhase } from "../../utils/phaseAnalysis.js";
+import { computePhase, computeStats, currentSeries, isRuleMet, sortByPhase } from "../../utils/phaseAnalysis.js";
 
 // Helper: build a fake contraction list with controlled gap (minutes) and duration (seconds)
 function makeContractions(entries) {
@@ -146,26 +146,113 @@ describe("computeStats", () => {
     expect(stats.trend).toBe("spacing out");
   });
 
-  it("sets rule511 when conditions are met (6+ contractions, ~5 min apart, ~1 min long)", () => {
+  it("ignores contractions before a gap of more than 60 minutes", () => {
     const now = Date.now();
-    const contractions = Array.from({ length: 6 }, (_, i) => ({
-      start: now - i * 5 * 60000,
-      duration: 60, // 60s >= 55s threshold
-      time: "12:00",
-    }));
+    const contractions = [
+      { start: now, duration: 40, time: "12:00" },
+      { start: now - 10 * 60000, duration: 40, time: "12:00" },
+      // 2-hour pause: yesterday's false alarm below must not count
+      { start: now - 130 * 60000, duration: 90, time: "12:00" },
+      { start: now - 132 * 60000, duration: 90, time: "12:00" },
+    ];
     const stats = computeStats(contractions);
-    expect(stats.rule511).toBe(true);
+    expect(stats.avgGap).toBe(10);
+    expect(stats.avgDur).toBe(40);
   });
 
-  it("does not set rule511 with fewer than 6 contractions", () => {
+  it("returns null when the current series has fewer than 2 contractions", () => {
     const now = Date.now();
-    const contractions = Array.from({ length: 5 }, (_, i) => ({
-      start: now - i * 5 * 60000,
-      duration: 60,
+    const contractions = [
+      { start: now, duration: 40, time: "12:00" },
+      { start: now - 90 * 60000, duration: 40, time: "12:00" },
+    ];
+    expect(computeStats(contractions)).toBeNull();
+  });
+});
+
+describe("currentSeries", () => {
+  it("returns all contractions when no gap exceeds 60 minutes", () => {
+    const now = Date.now();
+    const contractions = makeCtx([[now, 40], [now - 60 * 60000, 40], [now - 120 * 60000, 40]]);
+    expect(currentSeries(contractions)).toHaveLength(3);
+  });
+
+  it("stops at the first gap longer than 60 minutes", () => {
+    const now = Date.now();
+    const contractions = makeCtx([[now, 40], [now - 5 * 60000, 40], [now - 70 * 60000, 40]]);
+    expect(currentSeries(contractions)).toHaveLength(2);
+  });
+
+  it("returns an empty list for no contractions", () => {
+    expect(currentSeries([])).toEqual([]);
+  });
+});
+
+describe("isRuleMet", () => {
+  const series = (count, gapMin, dur) => {
+    const now = Date.now();
+    return Array.from({ length: count }, (_, i) => ({
+      start: now - i * gapMin * 60000,
+      duration: dur,
       time: "12:00",
     }));
-    const stats = computeStats(contractions);
-    expect(stats.rule511).toBe(false);
+  };
+
+  it("is met for 5-1-1 with 10 contractions 5 min apart lasting 60s", () => {
+    expect(isRuleMet(series(10, 5, 60), "5-1-1")).toBe(true);
+  });
+
+  it("stays met when contractions get closer than the rule (3 min apart on 5-1-1)", () => {
+    expect(isRuleMet(series(10, 3, 60), "5-1-1")).toBe(true);
+  });
+
+  it("is not met with fewer than 10 contractions in the series", () => {
+    expect(isRuleMet(series(9, 5, 60), "5-1-1")).toBe(false);
+  });
+
+  it("is not met when contractions are too short on average", () => {
+    expect(isRuleMet(series(10, 5, 45), "5-1-1")).toBe(false);
+  });
+
+  it("accepts an average duration of 55s", () => {
+    expect(isRuleMet(series(10, 5, 55), "5-1-1")).toBe(true);
+  });
+
+  it("is not met for 4-1-1 when contractions are 5 min apart", () => {
+    expect(isRuleMet(series(10, 5, 60), "4-1-1")).toBe(false);
+  });
+
+  it("is met for 3-1-1 when contractions are 3 min apart", () => {
+    expect(isRuleMet(series(10, 3, 60), "3-1-1")).toBe(true);
+  });
+
+  it("only counts the current series", () => {
+    const now = Date.now();
+    const old = series(10, 5, 60).map((c) => ({ ...c, start: c.start - 180 * 60000 }));
+    const recent = [{ start: now, duration: 60, time: "12:00" }];
+    expect(isRuleMet([...recent, ...old], "5-1-1")).toBe(false);
+  });
+
+  it("falls back to 5-1-1 for an unknown rule id", () => {
+    expect(isRuleMet(series(10, 5, 60), "bogus")).toBe(true);
+  });
+
+  it("is reported by computeStats as ruleMet", () => {
+    expect(computeStats(series(10, 5, 60), "5-1-1").ruleMet).toBe(true);
+    expect(computeStats(series(10, 5, 60), "4-1-1").ruleMet).toBe(false);
+  });
+});
+
+describe("computePhase — contraction series", () => {
+  it("returns 'tracking' when the old run is separated by a long pause", () => {
+    const now = Date.now();
+    const old = Array.from({ length: 6 }, (_, i) => ({
+      start: now - 200 * 60000 - i * 2 * 60000,
+      duration: 70,
+      time: "12:00",
+    }));
+    const recent = [{ start: now, duration: 30, time: "12:00" }];
+    expect(computePhase([...recent, ...old])).toBe("tracking");
   });
 });
 

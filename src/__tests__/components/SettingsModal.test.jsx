@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "../../components/SettingsModal.jsx";
@@ -32,6 +32,17 @@ const mockContext = {
 
 vi.mock("../../context/LocaleContext.jsx", () => ({
   useLocaleContext: () => mockContext,
+}));
+
+let feedbackEmail = "";
+vi.mock("../../utils/feedback.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  getFeedbackEmail: () => feedbackEmail,
+}));
+
+let cloudConfigured = true;
+vi.mock("../../utils/cloudConfig.js", () => ({
+  isCloudConfigured: () => cloudConfigured,
 }));
 
 vi.mock("../../context/FeatureFlagContext.jsx", () => ({
@@ -146,5 +157,81 @@ describe("SettingsModal", () => {
     const [alphaSwitch] = screen.getAllByRole("switch");
     await userEvent.click(alphaSwitch);
     expect(mockSetFlag).toHaveBeenCalledWith("alpha", false);
+  });
+});
+
+describe("SettingsModal — contraction rule", () => {
+  const contractionRule = { rule: "5-1-1", setRule: vi.fn(), rules: ["5-1-1", "4-1-1", "3-1-1"] };
+
+  it("renders one option per rule with the active one pressed", () => {
+    render(<SettingsModal open={true} onClose={() => {}} contractionRule={contractionRule} />);
+    const options = screen.getAllByRole("button", { pressed: false }).concat(screen.getAllByRole("button", { pressed: true }))
+      .filter((b) => b.dataset.rule);
+    expect(options.map((b) => b.dataset.rule).sort()).toEqual(["3-1-1", "4-1-1", "5-1-1"]);
+    expect(screen.getByRole("button", { pressed: true }).dataset.rule).toBe("5-1-1");
+  });
+
+  it("calls setRule when another rule is picked", async () => {
+    render(<SettingsModal open={true} onClose={() => {}} contractionRule={contractionRule} />);
+    const btn = screen.getAllByRole("button").find((b) => b.dataset.rule === "4-1-1");
+    await userEvent.click(btn);
+    expect(contractionRule.setRule).toHaveBeenCalledWith("4-1-1");
+  });
+});
+
+describe("SettingsModal — cloud sync gating", () => {
+  const signedOut = { isSignedIn: false, syncing: false, signIn: vi.fn(), joinAsPartner: vi.fn() };
+  const signedIn = { isSignedIn: true, syncing: false, role: "primary", unsync: vi.fn() };
+
+  afterEach(() => {
+    mockFlagContext.flags = {};
+    mockFlagContext.flagDefs = [];
+    cloudConfigured = true;
+  });
+
+  it("hides sign-in when the cloudSync flag is off", () => {
+    render(<SettingsModal open={true} onClose={() => {}} cloudSync={signedOut} />);
+    expect(screen.queryByText("settings.cloudSyncStart")).not.toBeInTheDocument();
+  });
+
+  it("shows sign-in when the flag is on and Supabase is configured", () => {
+    mockFlagContext.flags = { cloudSync: true };
+    render(<SettingsModal open={true} onClose={() => {}} cloudSync={signedOut} />);
+    expect(screen.getByText("settings.cloudSyncStart")).toBeInTheDocument();
+  });
+
+  it("hides sign-in when Supabase is not configured even if the flag is on", () => {
+    mockFlagContext.flags = { cloudSync: true };
+    cloudConfigured = false;
+    render(<SettingsModal open={true} onClose={() => {}} cloudSync={signedOut} />);
+    expect(screen.queryByText("settings.cloudSyncStart")).not.toBeInTheDocument();
+  });
+
+  it("keeps the synced state and Unsync visible for an already-synced device with the flag off", () => {
+    render(<SettingsModal open={true} onClose={() => {}} cloudSync={signedIn} />);
+    expect(screen.getByText("settings.cloudSyncUnsync")).toBeInTheDocument();
+  });
+
+  it("hides the cloudSync flag toggle when Supabase is not configured", () => {
+    cloudConfigured = false;
+    mockFlagContext.flagDefs = [{ id: "cloudSync", labelKey: "flags.cloudSync" }];
+    render(<SettingsModal open={true} onClose={() => {}} />);
+    expect(screen.queryByText("flags.cloudSync")).not.toBeInTheDocument();
+  });
+});
+
+describe("SettingsModal — feedback", () => {
+  afterEach(() => { feedbackEmail = ""; });
+
+  it("hides the feedback link when no address is configured", () => {
+    render(<SettingsModal open={true} onClose={() => {}} />);
+    expect(screen.queryByText("settings.sendFeedback")).not.toBeInTheDocument();
+  });
+
+  it("shows a mailto feedback link when an address is configured", () => {
+    feedbackEmail = "hi@example.com";
+    render(<SettingsModal open={true} onClose={() => {}} />);
+    const link = screen.getByText("settings.sendFeedback").closest("a");
+    expect(link.getAttribute("href")).toMatch(/^mailto:hi@example\.com\?/);
   });
 });

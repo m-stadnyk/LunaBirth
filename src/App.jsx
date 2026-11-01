@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { N } from "./theme/index.js";
+import { showNotification } from "./utils/notify.js";
 import { useAppMode } from "./hooks/useAppMode.js";
 import { useDueDate } from "./hooks/useDueDate.js";
 import { useTodos } from "./hooks/useTodos.js";
@@ -8,6 +9,7 @@ import { useHydration } from "./hooks/useHydration.js";
 import { useAffirmations } from "./hooks/useAffirmations.js";
 import { useRelief } from "./hooks/useRelief.js";
 import { useLabourContacts } from "./hooks/useLabourContacts.js";
+import { useContractionRule } from "./hooks/useContractionRule.js";
 import { useNotifications } from "./hooks/useNotifications.js";
 import { useCloudSync } from "./hooks/useCloudSync.js";
 import { useAppUpdate } from "./hooks/useAppUpdate.js";
@@ -21,6 +23,8 @@ import { MethodModal } from "./components/MethodModal.jsx";
 import { SettingsModal } from "./components/SettingsModal.jsx";
 import { LabourContactsModal } from "./components/LabourContactsModal.jsx";
 import { DebugPopup } from "./components/DebugPopup.jsx";
+import { UpdateBanner } from "./components/UpdateBanner.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import { ResetModal } from "./components/ResetModal.jsx";
 import { ContractionsTab } from "./features/contractions/ContractionsTab.jsx";
 import { HydrationTab } from "./features/hydration/HydrationTab.jsx";
@@ -61,18 +65,23 @@ function AppInner() {
   const cloudSync = useCloudSync({
     onRemoteModeChange: (newMode) => {
       setMode(newMode);
-      if (newMode === "labour" && typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification(t("notifications.labourStarted.title"), {
+      if (newMode === "labour") {
+        showNotification(t("notifications.labourStarted.title"), {
           body: t("notifications.labourStarted.body"),
-          icon: "/icons/icon-192x192.png",
           tag: "luna-mode",
           renotify: true,
         });
       }
     },
   });
-  const hydration = useHydration({ onDrinkAlert: notifications.notifyWater });
-  const contractions = useContractions({ onPhaseChange: hydration.handlePhaseChange });
+  const hydration = useHydration({
+    onDrinkAlert: () => notifications.notifyWater(t("notifications.waterTitle"), t("notifications.waterBody")),
+  });
+  const contractionRule = useContractionRule();
+  const contractions = useContractions({
+    onPhaseChange: hydration.handlePhaseChange,
+    rule: contractionRule.rule,
+  });
   const relief = useRelief();
   const labourContacts = useLabourContacts();
   const todos = useTodos();
@@ -101,6 +110,7 @@ function AppInner() {
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <TabBar activeTab={tab} onTabChange={setTab} mode={mode} />
+        <UpdateBanner appUpdate={appUpdate} />
 
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 80px" }}>
 
@@ -130,6 +140,7 @@ function AppInner() {
               setClearConfirm={contractions.setClearConfirm}
               phase={contractions.phase}
               stats={contractions.stats}
+              rule={contractionRule.rule}
               handleContraction={contractions.handleContraction}
               clearAll={contractions.clearAll}
             />
@@ -188,6 +199,7 @@ function AppInner() {
           notifications={notifications}
           cloudSync={cloudSync}
           appUpdate={appUpdate}
+          contractionRule={contractionRule}
           onOpenResetModal={() => { setSettingsOpen(false); setResetOpen(true); }}
         />
 
@@ -218,18 +230,21 @@ function AppInner() {
 /**
  * Provider order: DatabaseProvider is outermost so all inner contexts
  * (LocaleProvider, FeatureFlagProvider) can use the active adapter for persistence.
- * DebugProvider must wrap AppInner so hooks inside AppInner can call useDebug().
+ * DebugProvider sits just inside it so every persisting hook — including the
+ * locale and flag providers — can report save failures.
  */
 export default function App() {
   return (
     <DatabaseProvider>
-      <LocaleProvider>
-        <FeatureFlagProvider>
-          <DebugProvider>
-            <AppInner />
-          </DebugProvider>
-        </FeatureFlagProvider>
-      </LocaleProvider>
+      <DebugProvider>
+        <LocaleProvider>
+          <FeatureFlagProvider>
+            <ErrorBoundary>
+              <AppInner />
+            </ErrorBoundary>
+          </FeatureFlagProvider>
+        </LocaleProvider>
+      </DebugProvider>
     </DatabaseProvider>
   );
 }

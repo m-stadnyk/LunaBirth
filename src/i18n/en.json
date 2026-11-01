@@ -28,8 +28,12 @@
     "gap": "Gap",
     "intensifying": "^ intensifying",
     "spacingOut": "v spacing out",
-    "rule511Title": "5-1-1 Rule Reached",
-    "rule511Body": "Contractions ~5 min apart, ~1 min long, sustained. Most providers recommend heading to your birth location now. Call your midwife or OB."
+    "ruleTitle": "{{rule}} rule reached",
+    "ruleBody": "Your last 10 contractions are on average {{minutes}} min apart or closer and about a minute long. If this matches what your provider advised, contact your midwife or birth team now.",
+    "ruleFooter": "Rule: {{rule}} · change in Settings",
+    "disclaimer": "LunaBirth is a support tool, not medical advice. Follow your midwife's or doctor's guidance and get help right away if something feels wrong.",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "hydration": {
     "untilNextSip": "until next sip",
@@ -142,7 +146,13 @@
     "checkForUpdates": "Check for Updates",
     "updateChecking": "Checking…",
     "updateUpToDate": "You're up to date",
-    "updateAvailable": "Update found — reloading…"
+    "updateAvailable": "Update found — reloading…",
+    "contractionRuleLabel": "Contraction rule",
+    "contractionRuleHint": "Choose the rule your midwife or doctor advised. It sets when LunaBirth suggests contacting your birth team.",
+    "contractionRuleOption": "{{rule}} · {{minutes}} min apart or closer",
+    "waterNotifHint": "Reminders only appear while LunaBirth is open on screen.",
+    "feedbackLabel": "Feedback",
+    "sendFeedback": "Send feedback by email"
   },
   "reset": {
     "title": "Reset Data",
@@ -169,7 +179,8 @@
     }
   },
   "flags": {
-    "debugPopup": "Debug error popup"
+    "debugPopup": "Debug error popup",
+    "cloudSync": "Cloud sync & partner (experimental)"
   },
   "contacts": {
     "title": "Labour Contacts",
@@ -180,5 +191,16 @@
     "save": "Save",
     "cancel": "Cancel",
     "importBtn": "Import from phone contacts"
+  },
+  "update": {
+    "bannerText": "A new version of LunaBirth is ready.",
+    "bannerHint": "Update when you're not timing a contraction.",
+    "updateNow": "Update now",
+    "updating": "Updating…"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "body": "Your data is saved on this device. Reload to continue — if this keeps happening, please send feedback from Settings.",
+    "reload": "Reload"
   }
 }

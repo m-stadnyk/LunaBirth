@@ -416,3 +416,23 @@ describe("useTodos", () => {
     });
   });
 });
+
+describe("useTodos — data reset", () => {
+  it("clears todos from state when a reset reloads an empty list", async () => {
+    const adapter = createMockAdapter({
+      getTodos: vi.fn(async () => [{ id: "a", text: "x", priority: "medium", done: false }]),
+    });
+    let ctx = { adapter, setAdapter: vi.fn(), resetKey: 0 };
+    const wrapper = ({ children }) =>
+      React.createElement(DatabaseContext.Provider, { value: ctx }, children);
+    const { result, rerender } = renderHook(() => useTodos(), { wrapper });
+    await act(async () => {});
+    expect(result.current.todos).toHaveLength(1);
+
+    adapter.getTodos.mockResolvedValue([]);
+    ctx = { ...ctx, resetKey: 1 };
+    rerender();
+    await act(async () => {});
+    expect(result.current.todos).toHaveLength(0);
+  });
+});

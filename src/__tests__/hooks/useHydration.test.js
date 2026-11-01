@@ -230,3 +230,25 @@ describe("useHydration", () => {
     expect(result.current.secsLeft).toBe(0);
   });
 });
+
+describe("useHydration — data reset", () => {
+  it("falls back to defaults when the adapter returns null (cloud row deleted)", async () => {
+    const adapter = createMockAdapter({
+      getHydration: vi.fn(async () => ({ drinkCount: 4, lastDrank: Date.now(), drinkInterval: 30, intervals: [30] })),
+    });
+    let ctx = { adapter, setAdapter: vi.fn(), resetKey: 0 };
+    const wrapper = ({ children }) =>
+      React.createElement(DatabaseContext.Provider, { value: ctx }, children);
+    const { result, rerender } = renderHook(() => useHydration(), { wrapper });
+    await act(async () => {});
+    expect(result.current.drinkCount).toBe(4);
+
+    adapter.getHydration.mockResolvedValue(null);
+    ctx = { ...ctx, resetKey: 1 };
+    rerender();
+    await act(async () => {});
+    expect(result.current.drinkCount).toBe(0);
+    expect(result.current.drinkInterval).toBe(15);
+    expect(result.current.intervals).toEqual([5, 15, 30]);
+  });
+});

@@ -2,6 +2,9 @@ import { useState } from "react";
 import { N } from "../theme/index.js";
 import { useLocaleContext } from "../context/LocaleContext.jsx";
 import { useFeatureFlags } from "../context/FeatureFlagContext.jsx";
+import { CONTRACTION_RULES } from "../constants/contractionRules.js";
+import { isCloudConfigured } from "../utils/cloudConfig.js";
+import { getFeedbackEmail, buildFeedbackLink } from "../utils/feedback.js";
 
 function ToggleRow({ label, checked, onChange, disabled }) {
   return (
@@ -65,6 +68,9 @@ function NotificationsSection({ notifications, t }) {
           onChange={() => notifications.toggle()}
           disabled={isDenied}
         />
+        <p style={{ margin: "4px 0 0", color: N.muted, fontSize: 12, paddingLeft: 4 }}>
+          {t("settings.waterNotifHint")}
+        </p>
         {isDenied && (
           <p style={{ margin: "4px 0 0", color: N.alert, fontSize: 12, paddingLeft: 4 }}>
             {t("settings.notifDeniedHint")}
@@ -225,6 +231,41 @@ function CloudSyncSection({ cloudSync, t }) {
   );
 }
 
+function ContractionRuleSection({ contractionRule, t }) {
+  return (
+    <>
+      <SectionLabel>{t("settings.contractionRuleLabel")}</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {contractionRule.rules.map((id) => {
+          const active = id === contractionRule.rule;
+          return (
+            <button
+              key={id}
+              data-rule={id}
+              aria-pressed={active}
+              onClick={() => contractionRule.setRule(id)}
+              style={{
+                textAlign: "left",
+                background: active ? N.goldLight : N.cream,
+                border: `1px solid ${active ? N.gold : N.border}`,
+                borderRadius: 10, padding: "12px 16px",
+                color: active ? N.gold : N.text,
+                fontSize: 15, cursor: "pointer",
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {t("settings.contractionRuleOption", { rule: id, minutes: CONTRACTION_RULES[id].maxGapMin })}
+            </button>
+          );
+        })}
+        <p style={{ margin: "4px 0 0", color: N.muted, fontSize: 12, paddingLeft: 4 }}>
+          {t("settings.contractionRuleHint")}
+        </p>
+      </div>
+    </>
+  );
+}
+
 function DataSection({ onOpenResetModal, t }) {
   return (
     <>
@@ -250,7 +291,7 @@ function DataSection({ onOpenResetModal, t }) {
 }
 
 function AppVersionSection({ appUpdate, t }) {
-  const { status, checkForUpdates } = appUpdate;
+  const { status, checkForUpdates, updateAvailable, applyUpdate } = appUpdate;
 
   const statusText = {
     checking: t("settings.updateChecking"),
@@ -271,7 +312,7 @@ function AppVersionSection({ appUpdate, t }) {
             v{__APP_VERSION__}
           </span>
           <button
-            onClick={checkForUpdates}
+            onClick={updateAvailable ? applyUpdate : checkForUpdates}
             disabled={status !== "idle"}
             style={{
               background: "none", border: `1px solid ${N.border}`,
@@ -281,7 +322,9 @@ function AppVersionSection({ appUpdate, t }) {
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            {status === "checking" ? t("settings.updateChecking") : t("settings.checkForUpdates")}
+            {status === "checking"
+              ? t("settings.updateChecking")
+              : updateAvailable ? t("update.updateNow") : t("settings.checkForUpdates")}
           </button>
         </div>
         {statusText && status !== "checking" && (
@@ -294,11 +337,21 @@ function AppVersionSection({ appUpdate, t }) {
   );
 }
 
-export function SettingsModal({ open, onClose, notifications, cloudSync, appUpdate, onOpenResetModal }) {
+export function SettingsModal({
+  open, onClose, notifications, cloudSync, appUpdate, onOpenResetModal, contractionRule,
+}) {
   const { locale, setLocale, t, supportedLocales } = useLocaleContext();
   const { flags, setFlag, flagDefs } = useFeatureFlags();
 
   if (!open) return null;
+
+  // Cloud sync ships dark (docs/adr/0002-cloud-sync-ships-dark.md): sign-in is
+  // offered only with the flag on and Supabase configured; an already-synced
+  // device always keeps its status and Unsync.
+  const cloudConfigured = isCloudConfigured();
+  const showCloud = cloudSync && (cloudSync.isSignedIn || (flags.cloudSync && cloudConfigured));
+  const feedbackLink = buildFeedbackLink(getFeedbackEmail(), { version: __APP_VERSION__, locale });
+  const visibleFlags = flagDefs.filter(({ id }) => id !== "cloudSync" || cloudConfigured);
 
   return (
     <div
@@ -357,6 +410,13 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
           ))}
         </div>
 
+        {contractionRule && (
+          <>
+            <SectionDivider />
+            <ContractionRuleSection contractionRule={contractionRule} t={t} />
+          </>
+        )}
+
         {notifications && (
           <>
             <SectionDivider />
@@ -364,7 +424,7 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
           </>
         )}
 
-        {cloudSync && (
+        {showCloud && (
           <>
             <SectionDivider />
             <CloudSyncSection cloudSync={cloudSync} t={t} />
@@ -374,11 +434,11 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
         {/* Feature flags */}
         <SectionDivider />
         <SectionLabel>{t("settings.featuresLabel")}</SectionLabel>
-        {flagDefs.length === 0 ? (
+        {visibleFlags.length === 0 ? (
           <p style={{ margin: 0, color: N.muted, fontSize: 13 }}>{t("settings.noFlags")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {flagDefs.map(({ id, labelKey }) => (
+            {visibleFlags.map(({ id, labelKey }) => (
               <ToggleRow
                 key={id}
                 label={t(labelKey)}
@@ -394,6 +454,23 @@ export function SettingsModal({ open, onClose, notifications, cloudSync, appUpda
           <>
             <SectionDivider />
             <DataSection onOpenResetModal={onOpenResetModal} t={t} />
+          </>
+        )}
+
+        {feedbackLink && (
+          <>
+            <SectionDivider />
+            <SectionLabel>{t("settings.feedbackLabel")}</SectionLabel>
+            <a
+              href={feedbackLink}
+              style={{
+                display: "block", background: N.cream, border: `1px solid ${N.border}`,
+                borderRadius: 10, padding: "12px 16px", color: N.text,
+                fontSize: 15, textDecoration: "none",
+              }}
+            >
+              {t("settings.sendFeedback")}
+            </a>
           </>
         )}
 
